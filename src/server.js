@@ -24,7 +24,11 @@ app.use(helmet({
 
 // ✅ FIXED: CORS Configuration
 const corsOptions = {
-  origin: process.env.FRONTEND_URL,
+  origin: [
+    'http://localhost:3000', // Local development
+    'https://dept-exec-app.onrender.com', // Your frontend URL
+    process.env.FRONTEND_URL // From environment variable
+  ].filter(Boolean), // Remove any undefined values
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -32,6 +36,9 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// Add this for preflight requests
+app.options('*', cors(corsOptions));
 
 // ✅ FIXED: Handle preflight for API routes only (not wildcard)
 //app.options('/api/*', cors(corsOptions));
