@@ -24,7 +24,7 @@ app.use(helmet({
 
 // ✅ FIXED: CORS Configuration
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  origin: process.env.FRONTEND_URL,
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -117,7 +117,7 @@ connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode`);
     console.log(`📍 Port: ${PORT}`);
-    console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+    console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL }`);
     console.log(`📁 Uploads directory: ${path.join(__dirname, "uploads")}`);
 
     // Start background services
