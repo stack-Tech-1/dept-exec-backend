@@ -32,25 +32,34 @@ function startOverdueChecker() {
 
         console.log(`⚠️ Task overdue: ${task.title}`);
 
-        // Notify EXEC
-        if (task.assignedTo) {
-          // Email notification
-          await sendEmail({
-            to: task.assignedTo.email,
-            subject: "⚠️ Task Overdue",
-            text: `
-Hello ${task.assignedTo.name},
-
-The following task is now OVERDUE:
-
-Task: ${task.title}
-Due Date: ${task.dueDate.toDateString()}
-
-Please take immediate action.
-
-– Dept Exec System
-`,
-          });
+        // Notify EXEC               
+          if (task.assignedTo && task.assignedTo.email) {
+            await sendEmail({
+              to: task.assignedTo.email,
+              subject: `⚠️ Task Marked Overdue: ${task.title}`,
+              html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(to right, #f59e0b, #d97706); padding: 20px; text-align: center; color: white;">
+                  <h2>Task Overdue Notice</h2>
+                </div>
+                <div style="padding: 20px; background: white;">
+                  <p>Hello <strong>${task.assignedTo.name}</strong>,</p>
+                  <p>One of your tasks has been marked as <strong style="color: #dc2626;">OVERDUE</strong>:</p>
+                  
+                  <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0;">
+                    <h3 style="margin-top: 0; color: #92400e;">${task.title}</h3>
+                    <p><strong>Description:</strong> ${task.description || 'No description provided'}</p>
+                    <p><strong>Due Date:</strong> ${new Date(task.dueDate).toLocaleDateString()}</p>
+                    <p><strong>Priority:</strong> ${task.priority}</p>
+                    <p><strong>Assigned By:</strong> ${task.createdBy?.name || 'System'}</p>
+                  </div>
+                  
+                  <p>Please log in to update the task status or request an extension.</p>
+                  <p><em>– Department Executive System</em></p>
+                </div>
+              </div>
+              `,
+            });
 
           // In-app notification
           addNotification(

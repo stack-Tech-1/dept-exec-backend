@@ -60,6 +60,7 @@ const taskRoutes = require("./routes/task.routes");
 const systemRoutes = require("./routes/system.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const minutesRoutes = require("./routes/minutes.routes");
+const userRoutes = require("./routes/user.routes");
 
 // Import middleware
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
@@ -90,6 +91,7 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/minutes", minutesRoutes);
+app.use("/api/users", userRoutes);
 
 // Health check endpoint
 app.get("/health", (req, res) => {

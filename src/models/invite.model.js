@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { EXECUTIVE_POSITIONS } = require("./user.model");
 
 const inviteSchema = new mongoose.Schema({
   email: {
@@ -11,6 +12,11 @@ const inviteSchema = new mongoose.Schema({
     type: String, 
     enum: ["ADMIN", "EXEC"],
     required: true
+  },
+  position: {
+    type: String,
+    enum: EXECUTIVE_POSITIONS,
+    default: "Executive Member"
   },
   token: {
     type: String,
@@ -27,7 +33,8 @@ const inviteSchema = new mongoose.Schema({
   },
   invitedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'User',
+    required: true
   }
 }, { 
   timestamps: true 

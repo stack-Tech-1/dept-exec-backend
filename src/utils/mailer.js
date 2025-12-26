@@ -15,16 +15,18 @@ const transporter = nodemailer.createTransport({
   greetingTimeout: 10000,
 });
 
-exports.sendEmail = async ({ to, subject, text }) => {
+exports.sendEmail = async ({ to, subject, html, text }) => {
   try {
     console.log(`📧 Attempting to send email to: ${to}`);
+    console.log(`📧 HTML length: ${html?.length || 0}`);    
     console.log(`📧 Using email: ${process.env.EMAIL_USER}`);
     
     const mailOptions = {
       from: `"Dept Exec System" <${process.env.EMAIL_USER}>`,
       to: to,
       subject: subject,
-      text: text,
+      html: html,
+      text: text || "You have been invited to the Department Executive System.",
     };
     
     console.log("📧 Mail options prepared");

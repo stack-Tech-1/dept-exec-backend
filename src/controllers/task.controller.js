@@ -38,51 +38,63 @@ exports.createTask = async (req, res) => {
     }],
   });
 
-  // Send email notification
+  // Send email notification with position
   await sendEmail({
     to: assignedUser.email,
-    subject: "New Task Assigned to You",
-    text: `
-Hello ${assignedUser.name},
-
-You have been assigned a new task:
-
-Task: ${title}
-Description: ${description || 'No description provided'}
-Due Date: ${new Date(dueDate).toDateString()}
-Priority: ${priority || "MEDIUM"}
-
-Please log in to the system to begin work.
-
-– Dept Exec System
-`,
+    subject: `New Task Assigned to ${assignedUser.position} - ${assignedUser.name}`,
+    html: `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #0d7c3d; padding: 20px; text-align: center; color: white;">
+        <h2>New Task Assigned</h2>
+      </div>
+      <div style="padding: 20px; background: white;">
+        <p>Hello <strong>${assignedUser.position} ${assignedUser.name}</strong>,</p>
+        <p>You have been assigned a new task:</p>
+        
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <h3 style="margin-top: 0;">${title}</h3>
+          <p><strong>Description:</strong> ${description || 'No description provided'}</p>
+          <p><strong>Due Date:</strong> ${new Date(dueDate).toLocaleDateString()}</p>
+          <p><strong>Priority:</strong> <span style="color: ${
+            priority === 'HIGH' ? '#dc3545' : 
+            priority === 'MEDIUM' ? '#ffc107' : '#28a745'
+          }">${priority || "MEDIUM"}</span></p>
+          <p><strong>Assigned by:</strong> ${req.user.name} (${req.user.position})</p>
+        </div>
+        
+        <p>Please log in to the system to begin work.</p>
+        <p><em>– Department Executive System</em></p>
+      </div>
+    </div>
+    `,
   });
 
   // In-app notification
   addNotification(
     assignedUser.id,
-    `New task assigned: ${title}`
+    `New task assigned to you as ${assignedUser.position}: ${title}`
   );
 
   const populatedTask = await Task.findById(task._id)
-    .populate('assignedTo', 'name email')
-    .populate('createdBy', 'name email');
+    .populate('assignedTo', 'name email position') 
+    .populate('createdBy', 'name email position'); 
 
   res.status(201).json(populatedTask);
 };
 
+// Update other methods to populate position as needed
 exports.getTasks = async (req, res) => {
-  if (req.user.role === "EXEC") {
-    const tasks = await Task.find({ assignedTo: req.user.id })
-      .populate('assignedTo', 'name email')
-      .populate('createdBy', 'name email')
-      .sort({ dueDate: 1 });
-    return res.json(tasks);
-  }
+    if (req.user.role === "EXEC") {
+      const tasks = await Task.find({ assignedTo: req.user.id })
+        .populate('assignedTo', 'name email position') 
+        .populate('createdBy', 'name email position') 
+        .sort({ dueDate: 1 });
+      return res.json(tasks);
+    }
 
-  const tasks = await Task.find()
-    .populate('assignedTo', 'name email')
-    .populate('createdBy', 'name email')
+    const tasks = await Task.find()
+    .populate('assignedTo', 'name email position') 
+    .populate('createdBy', 'name email position') 
     .sort({ dueDate: 1 });
   
   res.json(tasks);
