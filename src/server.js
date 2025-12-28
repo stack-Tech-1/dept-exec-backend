@@ -92,13 +92,11 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads"), {
   }
 }));
 
-// API Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/tasks", taskRoutes);
-app.use("/api/system", systemRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/minutes", minutesRoutes);
-app.use("/api/users", userRoutes);
+
+// ✅ FIXED: Root Route to stop Render's 404 logs
+app.get("/", (req, res) => {
+  res.status(200).send("IPE Department Executive API is Live 🚀");
+});
 
 // Health check endpoint
 app.get("/health", (req, res) => {
@@ -108,6 +106,16 @@ app.get("/health", (req, res) => {
     environment: process.env.NODE_ENV || 'development'
   });
 });
+
+// API Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/tasks", taskRoutes);
+app.use("/api/system", systemRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/minutes", minutesRoutes);
+app.use("/api/users", userRoutes);
+
+
 
 // ✅ SECURITY: 404 Handler (must be before errorHandler)
 app.use(notFoundHandler);
