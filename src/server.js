@@ -7,6 +7,7 @@ const path = require("path");
 const fs = require("fs");
 
 const app = express();
+app.set('trust proxy', 1);
 
 // ✅ SECURITY: Helmet for security headers
 app.use(helmet({
