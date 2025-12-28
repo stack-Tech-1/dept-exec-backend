@@ -1,19 +1,25 @@
 const nodemailer = require("nodemailer");
 
 // Create transporter with EXPLICIT settings
-// Simplified for Gmail - This is more reliable on Render/Cloud
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Let Nodemailer handle the host/port
+  host: "smtp.gmail.com", // Explicitly set the host
+  port: 587,              // Use the confirmed working port
+  secure: false,          // Must be 'false' for port 587 (uses STARTTLS)
+  requireTLS: true,       // Ensure a TLS connection is used
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  pool: true, // Uses a pool of connections (better for many emails)
+  // Optional: Add timeout settings to prevent long hangs
+  connectionTimeout: 20000, // 10 seconds
+  greetingTimeout: 20000,
 });
 
 exports.sendEmail = async ({ to, subject, html, text }) => {
   try {
     console.log(`📧 Attempting to send email to: ${to}`);
+    console.log(`📧 HTML length: ${html?.length || 0}`);    
+    console.log(`📧 Using email: ${process.env.EMAIL_USER}`);
     
     const mailOptions = {
       from: `"Dept Exec System" <${process.env.EMAIL_USER}>`,
