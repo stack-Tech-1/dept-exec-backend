@@ -28,6 +28,7 @@ const corsOptions = {
   origin: [
     'http://localhost:3000', // Local development
     'https://dept-exec-app.onrender.com', // Your frontend URL
+    'https://dept-exec-app.vercel.app', // Another frontend URL
     process.env.FRONTEND_URL // From environment variable
   ].filter(Boolean), // Remove any undefined values
   credentials: true,
