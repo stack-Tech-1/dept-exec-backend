@@ -79,10 +79,12 @@ const connectDB = require("./config/db");
 const startOverdueChecker = require("./utils/overdueChecker");
 
 // ✅ SECURITY: Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, "uploads", "minutes");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log(`✅ Created uploads directory: ${uploadsDir}`);
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  const uploadsDir = path.join(__dirname, "uploads", "minutes");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log(`✅ Created uploads directory: ${uploadsDir}`);
+  }
 }
 
 // Serve static files (uploaded recordings)
