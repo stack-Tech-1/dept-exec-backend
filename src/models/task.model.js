@@ -28,6 +28,21 @@ const taskSchema = new mongoose.Schema({
     enum: ["PENDING", "IN_PROGRESS", "COMPLETED", "OVERDUE"],
     default: "PENDING",
   },
+  updateHistory: [{
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    changes: {
+      type: Object,
+      default: {},
+    },
+  }],
 
   completedAt: Date,
 

@@ -1,21 +1,30 @@
+// C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\routes\task.routes.js
 const express = require("express");
-const { protect } = require("../middleware/auth.middleware");
-const { authorizeRoles } = require("../middleware/authorize"); // ✅ ADD THIS
-const {
-  createTask,
-  getTasks,
-  updateTaskStatus,
-} = require("../controllers/task.controller");
-
 const router = express.Router();
+const taskController = require("../controllers/task.controller");
+const { authenticate, authorize } = require("../middleware/auth.middleware");
 
-// ✅ HARDENED: Only ADMIN can create tasks
-router.post("/", protect, authorizeRoles("ADMIN"), createTask);
+// All routes require authentication
+router.use(authenticate);
 
-// ALL AUTHENTICATED USERS: Get tasks (filtered by role in controller)
-router.get("/", protect, getTasks);
+//router.get("/statistics", taskController.getTaskStatistics);
 
-// ALL AUTHENTICATED USERS: Update task status (with ownership checks)
-router.patch("/:id/status", protect, updateTaskStatus);
+// Get all tasks (Admin sees all, Exec sees only assigned)
+router.get("/", taskController.getTasks);
+
+// Get task by ID
+router.get("/:id", taskController.getTaskById);
+
+// Create task (Admin only)
+router.post("/", authorize(["ADMIN"]), taskController.createTask);
+
+// Update task (Admin can update any, Exec can only update assigned)
+router.put("/:id", taskController.updateTask);
+
+// Update task status (Admin & Exec can update)
+router.patch("/:id/status", taskController.updateTaskStatus);
+
+// Delete task (Admin only)
+router.delete("/:id", authorize(["ADMIN"]), taskController.deleteTask);
 
 module.exports = router;

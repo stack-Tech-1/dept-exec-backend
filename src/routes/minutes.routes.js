@@ -1,47 +1,48 @@
+// C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\routes\minutes.routes.js
 const express = require("express");
-const { protect } = require("../middleware/auth.middleware");
-const { authorizeRoles } = require("../middleware/authorize"); // ✅ ADD THIS
-const upload = require("../utils/upload");
-const {
-  createMinutes,
-  getAllMinutes,
-  getMinutesById,
-  updateMinutes,
-  approveMinutes,
-  downloadMinutesPDF,
-} = require("../controllers/minutes.controller");
-
 const router = express.Router();
+const minutesController = require("../controllers/minutes.controller");
+const { authenticate, authorize } = require("../middleware/auth.middleware");
+const upload = require("../middleware/upload");
 
-// ✅ HARDENED: Use authorizeRoles middleware
-router.post(
-  "/",
-  protect,
-  authorizeRoles("ADMIN"),
-  upload.single("recording"),
-  createMinutes
+// All routes require authentication
+router.use(authenticate);
+
+// Get all minutes (Exec can only see approved)
+router.get("/", minutesController.getAllMinutes);
+
+// Get minutes statistics
+router.get("/statistics", minutesController.getMinutesStatistics);
+
+// Get single minutes
+router.get("/:id", minutesController.getMinutesById);
+
+// Download PDF (Exec can download approved minutes)
+router.get("/:id/download", minutesController.downloadMinutesPDF);
+
+// Create minutes (admin only)
+router.post("/", 
+  authorize(["ADMIN"]), 
+  upload.single("recording"), 
+  minutesController.createMinutes
 );
 
-// ALL USERS: view all minutes (with security filtering in controller)
-router.get("/", protect, getAllMinutes);
+// Update minutes (admin only, only if not approved)
+router.put("/:id", 
+  authorize(["ADMIN"]), 
+  minutesController.updateMinutes
+);
 
-// ALL USERS: view specific minutes by ID (with security in controller)
-router.get("/:id", protect, getMinutesById);
+// Approve minutes (admin only, cannot self-approve)
+router.post("/:id/approve", 
+  authorize(["ADMIN"]), 
+  minutesController.approveMinutes
+);
 
-// Download approved minutes as PDF
-router.get("/:id/pdf", protect, downloadMinutesPDF);
-
-// ✅ HARDENED: Use authorizeRoles middleware
-router.put("/:id", protect, authorizeRoles("ADMIN"), updateMinutes);
-
-// ✅ HARDENED: Use authorizeRoles middleware
-router.patch("/:id/approve", protect, authorizeRoles("ADMIN"), approveMinutes);
-
-// ✅ HARDENED: Disable DELETE entirely for audit integrity
-router.delete("/:id", protect, (req, res) => {
-  res.status(403).json({
-    message: "Minutes cannot be deleted for audit integrity",
-  });
-});
+// Delete minutes (admin only, only if not approved)
+router.delete("/:id", 
+  authorize(["ADMIN"]), 
+  minutesController.deleteMinutes
+);
 
 module.exports = router;

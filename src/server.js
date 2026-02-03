@@ -1,3 +1,4 @@
+//C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\server.js
 require('dotenv').config();
 const express = require("express");
 const helmet = require("helmet");
@@ -70,6 +71,9 @@ const systemRoutes = require("./routes/system.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const minutesRoutes = require("./routes/minutes.routes");
 const userRoutes = require("./routes/user.routes");
+const meetingRoutes = require("./routes/meeting.routes");
+const reportRoutes = require("./routes/report.routes");
+const goalRoutes = require("./routes/goal.routes");
 
 // Import middleware
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
@@ -118,14 +122,9 @@ app.use("/api/system", systemRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/minutes", minutesRoutes);
 app.use("/api/users", userRoutes);
-
-
-
-// ✅ SECURITY: 404 Handler (must be before errorHandler)
-app.use(notFoundHandler);
-
-// ✅ SECURITY: Global error handler (must be last)
-app.use(errorHandler);
+app.use("/api/meetings", meetingRoutes);
+app.use("/api/goals", goalRoutes);
+app.use("/api/reports", reportRoutes);
 
 const PORT = process.env.PORT || 5000;
 
@@ -147,3 +146,8 @@ connectDB().then(() => {
   console.error("❌ Failed to connect to database:", error);
   process.exit(1);
 });
+
+// ✅ SECURITY: 404 Handler (must be before errorHandler)
+app.use(notFoundHandler);
+// ✅ SECURITY: Global error handler (must be last)
+app.use(errorHandler);

@@ -1,3 +1,4 @@
+//C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\controllers\auth.controller.js
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Invite = require("../models/invite.model");

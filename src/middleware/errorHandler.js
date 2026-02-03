@@ -1,3 +1,4 @@
+//C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\middleware\errorHandler.js
 exports.errorHandler = (err, req, res, next) => {
     console.error(`❌ ${req.method} ${req.url}:`, err);
   

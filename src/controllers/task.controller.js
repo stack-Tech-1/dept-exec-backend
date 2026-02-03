@@ -1,3 +1,4 @@
+//C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\controllers\task.controller.js
 const Task = require("../models/task.model");
 const User = require("../models/user.model");
 
@@ -187,4 +188,230 @@ Completed At: ${task.completedAt.toDateString()}
     .populate('createdBy', 'name email');
 
   res.json(populatedTask);
+};
+
+// Add these methods to your existing task.controller.js
+
+exports.getTaskById = async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id)
+      .populate('assignedTo', 'name email position')
+      .populate('createdBy', 'name email position')
+      .populate('statusHistory.changedBy', 'name email position');
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    // ✅ HARDENED: Exec can only access tasks assigned to them
+    if (req.user.role === "EXEC" && task.assignedTo._id.toString() !== req.user.id) {
+      return res.status(403).json({
+        message: "You can only view tasks assigned to you",
+      });
+    }
+
+    res.json(task);
+  } catch (error) {
+    console.error("Get task by ID error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.updateTask = async (req, res) => {
+  try {
+    const { title, description, assignedTo, dueDate, priority } = req.body;
+    const taskId = req.params.id;
+
+    const task = await Task.findById(taskId);
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    // ✅ HARDENED: Check permissions
+    if (req.user.role === "EXEC") {
+      // Exec can only update tasks assigned to them
+      if (task.assignedTo.toString() !== req.user.id) {
+        return res.status(403).json({
+          message: "You can only update tasks assigned to you",
+        });
+      }
+      
+      // Exec can only update certain fields
+      const allowedFields = ['title', 'description'];
+      const updateData = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field];
+        }
+      }
+      
+      Object.assign(task, updateData);
+    } else if (req.user.role === "ADMIN") {
+      // Admin can update any field
+      if (title !== undefined) task.title = title;
+      if (description !== undefined) task.description = description;
+      if (dueDate !== undefined) task.dueDate = new Date(dueDate);
+      if (priority !== undefined) task.priority = priority;
+      
+      // If assignedTo changed, notify new assignee
+      if (assignedTo && task.assignedTo.toString() !== assignedTo) {
+        const newAssignee = await User.findById(assignedTo);
+        if (!newAssignee) {
+          return res.status(400).json({ message: "Invalid user assigned" });
+        }
+        
+        // Notify old assignee
+        addNotification(
+          task.assignedTo,
+          `Task reassigned: ${task.title}`
+        );
+        
+        // Notify new assignee
+        await sendEmail({
+          to: newAssignee.email,
+          subject: `Task Reassigned to You: ${task.title}`,
+          html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #0d7c3d; padding: 20px; text-align: center; color: white;">
+              <h2>Task Reassigned</h2>
+            </div>
+            <div style="padding: 20px; background: white;">
+              <p>Hello <strong>${newAssignee.position} ${newAssignee.name}</strong>,</p>
+              <p>A task has been reassigned to you:</p>
+              
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                <h3 style="margin-top: 0;">${task.title}</h3>
+                <p><strong>Description:</strong> ${task.description || 'No description provided'}</p>
+                <p><strong>Due Date:</strong> ${task.dueDate.toLocaleDateString()}</p>
+                <p><strong>Priority:</strong> <span style="color: ${
+                  task.priority === 'HIGH' ? '#dc3545' : 
+                  task.priority === 'MEDIUM' ? '#ffc107' : '#28a745'
+                }">${task.priority}</span></p>
+                <p><strong>Reassigned by:</strong> ${req.user.name} (${req.user.position})</p>
+              </div>
+              
+              <p>Please log in to the system to view the task details.</p>
+              <p><em>– Department Executive System</em></p>
+            </div>
+          </div>
+          `,
+        });
+
+        addNotification(
+          newAssignee.id,
+          `Task reassigned to you as ${newAssignee.position}: ${task.title}`
+        );
+
+        task.assignedTo = assignedTo;
+      }
+    }
+
+    // Add to update history
+    task.updateHistory.push({
+      updatedBy: req.user.id,
+      updatedAt: new Date(),
+      changes: req.body
+    });
+
+    await task.save();
+
+    const populatedTask = await Task.findById(task._id)
+      .populate('assignedTo', 'name email position')
+      .populate('createdBy', 'name email position')
+      .populate('updateHistory.updatedBy', 'name email position');
+
+    res.json(populatedTask);
+
+  } catch (error) {
+    console.error("Update task error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+exports.deleteTask = async (req, res) => {
+  try {
+    if (req.user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Admins only" });
+    }
+
+    const task = await Task.findById(req.params.id);
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    // ✅ HARDENED: Prevent deletion of completed tasks
+    if (task.status === "COMPLETED") {
+      return res.status(400).json({
+        message: "Completed tasks cannot be deleted for record keeping",
+      });
+    }
+
+    // Notify assignee about task deletion
+    const assignee = await User.findById(task.assignedTo);
+    if (assignee) {
+      addNotification(
+        assignee.id,
+        `Task deleted: ${task.title}`
+      );
+    }
+
+    await task.deleteOne();
+
+    console.log(`🗑️ Task deleted: ${task.title} by user ${req.user.id}`);
+
+    res.json({ 
+      message: "Task deleted successfully",
+      taskId: req.params.id
+    });
+
+  } catch (error) {
+    console.error("Delete task error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Optional: Get task statistics
+exports.getTaskStatistics = async (req, res) => {
+  try {
+    let filter = {};
+    
+    // Exec can only see their own stats
+    if (req.user.role === "EXEC") {
+      filter.assignedTo = req.user.id;
+    }
+
+    const totalTasks = await Task.countDocuments(filter);
+    const completedTasks = await Task.countDocuments({ ...filter, status: "COMPLETED" });
+    const pendingTasks = await Task.countDocuments({ ...filter, status: "PENDING" });
+    const inProgressTasks = await Task.countDocuments({ ...filter, status: "IN_PROGRESS" });
+    const overdueTasks = await Task.countDocuments({ ...filter, status: "OVERDUE" });
+
+    // Calculate completion rate
+    const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+    // Group by priority
+    const byPriority = await Task.aggregate([
+      { $match: filter },
+      { $group: { _id: "$priority", count: { $sum: 1 } } }
+    ]);
+
+    res.json({
+      totalTasks,
+      completedTasks,
+      pendingTasks,
+      inProgressTasks,
+      overdueTasks,
+      completionRate: Math.round(completionRate),
+      byPriority: byPriority.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {})
+    });
+
+  } catch (error) {
+    console.error("Get task statistics error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 };

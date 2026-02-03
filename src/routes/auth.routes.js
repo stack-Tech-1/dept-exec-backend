@@ -4,15 +4,14 @@ const {
   registerWithInvite,
   login,
 } = require("../controllers/auth.controller");
-const { protect } = require("../middleware/auth.middleware");
-const { authorizeRoles } = require("../middleware/authorize"); // ✅ ADD THIS
+const { authenticate, authorize } = require("../middleware/auth.middleware");
 const { validateInviteToken } = require("../controllers/auth.controller");
 
 
 const router = express.Router();
 
-// ✅ HARDENED: Use authorizeRoles middleware
-router.post("/invite", protect, authorizeRoles("ADMIN"), inviteUser);
+// ✅ HARDENED: Use authorize middleware
+router.post("/invite", authenticate, authorize("ADMIN"), inviteUser);
 
 // PUBLIC: Register with invite token
 router.post("/register", registerWithInvite);

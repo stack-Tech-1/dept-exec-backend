@@ -1,5 +1,85 @@
+//C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\controllers\minutes.controller.js
 const generateMinutesPDF = require("../utils/minutesPdf");
 const Minutes = require("../models/minutes.model");
+
+
+
+// Add these methods to your minutes.controller.js
+
+exports.getMinutesStatistics = async (req, res) => {
+  try {
+    const total = await Minutes.countDocuments();
+    const approved = await Minutes.countDocuments({ approved: true });
+    const pending = await Minutes.countDocuments({ approved: false });
+    
+    // Group by session
+    const bySession = await Minutes.aggregate([
+      { $group: { _id: "$session", count: { $sum: 1 } } }
+    ]);
+    
+    // Group by semester
+    const bySemester = await Minutes.aggregate([
+      { $group: { _id: "$semester", count: { $sum: 1 } } }
+    ]);
+
+    res.json({
+      total,
+      approved,
+      pending,
+      bySession: bySession.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {}),
+      bySemester: bySemester.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {})
+    });
+  } catch (error) {
+    console.error("Statistics error:", error);
+    res.status(500).json({ message: "Error fetching statistics" });
+  }
+};
+
+exports.deleteMinutes = async (req, res) => {
+  if (req.user.role !== "ADMIN") {
+    return res.status(403).json({ message: "Admins only" });
+  }
+
+  try {
+    const record = await Minutes.findById(req.params.id);
+
+    if (!record) {
+      return res.status(404).json({ message: "Minutes not found" });
+    }
+
+    // ✅ HARDENED: Prevent deletion of approved minutes
+    if (record.approved) {
+      return res.status(403).json({
+        message: "Approved minutes cannot be deleted",
+      });
+    }
+
+    // Delete recording file if exists
+    if (record.recordingUrl && process.env.NODE_ENV !== 'production') {
+      const fs = require('fs');
+      const path = require('path');
+      const filePath = path.join(__dirname, '..', record.recordingUrl);
+      
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    await record.deleteOne();
+    console.log(`🗑️ Minutes deleted: ${record.title} by user ${req.user.id}`);
+
+    res.json({ message: "Minutes deleted successfully" });
+  } catch (error) {
+    console.error("Delete error:", error);
+    res.status(500).json({ message: "Error deleting minutes" });
+  }
+};
 
 exports.createMinutes = async (req, res) => {
   if (req.user.role !== "ADMIN") {
