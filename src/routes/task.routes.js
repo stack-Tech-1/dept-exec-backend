@@ -3,6 +3,8 @@ const express = require("express");
 const router = express.Router();
 const taskController = require("../controllers/task.controller");
 const { authenticate, authorize } = require("../middleware/auth.middleware");
+const { paginateResults } = require('../middleware/pagination');
+const Task = require('../models/task.model');
 
 // All routes require authentication
 router.use(authenticate);
@@ -10,7 +12,20 @@ router.use(authenticate);
 //router.get("/statistics", taskController.getTaskStatistics);
 
 // Get all tasks (Admin sees all, Exec sees only assigned)
-router.get("/", taskController.getTasks);
+// Update GET / route:
+router.get("/", 
+  authenticate,
+  (req, res, next) => {
+    if (req.user.role === "EXEC") {
+      req.query.assignedTo = req.user.id;
+    }
+    next();
+  },
+  paginateResults(Task, ['assignedTo', 'createdBy']),
+  (req, res) => {
+    res.json(res.paginatedResults);
+  }
+);
 
 // Get task by ID
 router.get("/:id", taskController.getTaskById);

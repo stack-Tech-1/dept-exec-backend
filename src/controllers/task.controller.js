@@ -1,9 +1,9 @@
-//C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\controllers\task.controller.js
+// C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\controllers\task.controller.js
 const Task = require("../models/task.model");
 const User = require("../models/user.model");
 
 const { sendEmail } = require("../utils/mailer");
-const { addNotification } = require("../utils/notifications");
+const { addNotification, createTaskNotification } = require("../utils/notifications"); // Already added
 
 // ✅ ADD: Status transition rules (State Machine)
 const allowedTransitions = {
@@ -14,13 +14,37 @@ const allowedTransitions = {
 };
 
 exports.createTask = async (req, res) => {
-  const { title, description, assignedTo, dueDate, priority } = req.body;
+  const { title, description, assignedTo, dueDate, priority, assignByPosition } = req.body;
 
-  if (!title || !assignedTo || !dueDate) {
+  if (!title || !dueDate) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  const assignedUser = await User.findById(assignedTo);
+  let assigneeId = assignedTo;
+  
+  // ✅ AUTO-ASSIGN BY POSITION if assignByPosition is provided
+  if (assignByPosition && !assignedTo) {
+    const positionUser = await User.findOne({ 
+      position: { $regex: new RegExp(assignByPosition, 'i') },
+      role: 'EXEC',
+      isActive: true
+    });
+    
+    if (positionUser) {
+      assigneeId = positionUser._id;
+      console.log(`✅ Auto-assigned to ${positionUser.position}: ${positionUser.name}`);
+    } else {
+      return res.status(404).json({ 
+        message: `No active executive found with position: ${assignByPosition}` 
+      });
+    }
+  }
+
+  if (!assigneeId) {
+    return res.status(400).json({ message: "No assignee specified" });
+  }
+
+  const assignedUser = await User.findById(assigneeId);
   if (!assignedUser) {
     return res.status(400).json({ message: "Invalid user assigned" });
   }
@@ -28,10 +52,11 @@ exports.createTask = async (req, res) => {
   const task = await Task.create({
     title,
     description,
-    assignedTo,
+    assignedTo: assigneeId,
     dueDate: new Date(dueDate),
     priority: priority || "MEDIUM",
     createdBy: req.user.id,
+    assignedByPosition: assignByPosition || null,
     statusHistory: [{
       status: "PENDING",
       changedBy: req.user.id,
@@ -39,18 +64,18 @@ exports.createTask = async (req, res) => {
     }],
   });
 
-  // Send email notification with position
+  // Enhanced email notification with position context
   await sendEmail({
     to: assignedUser.email,
-    subject: `New Task Assigned to ${assignedUser.position} - ${assignedUser.name}`,
+    subject: `📋 New Task Assigned as ${assignedUser.position} - "${title}"`,
     html: `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #0d7c3d; padding: 20px; text-align: center; color: white;">
-        <h2>New Task Assigned</h2>
+        <h2>New Task Assigned to ${assignedUser.position}</h2>
       </div>
       <div style="padding: 20px; background: white;">
         <p>Hello <strong>${assignedUser.position} ${assignedUser.name}</strong>,</p>
-        <p>You have been assigned a new task:</p>
+        <p>You have been assigned a new task in your capacity as ${assignedUser.position}:</p>
         
         <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
           <h3 style="margin-top: 0;">${title}</h3>
@@ -61,6 +86,13 @@ exports.createTask = async (req, res) => {
             priority === 'MEDIUM' ? '#ffc107' : '#28a745'
           }">${priority || "MEDIUM"}</span></p>
           <p><strong>Assigned by:</strong> ${req.user.name} (${req.user.position})</p>
+          ${assignByPosition ? `<p><strong>Auto-assigned by position:</strong> ${assignByPosition}</p>` : ''}
+        </div>
+        
+        <div style="margin: 20px 0; padding: 15px; background: #e8f4fd; border-radius: 8px; border-left: 4px solid #0d7c3d;">
+          <h4 style="margin-top: 0; color: #0d7c3d;">Role Context</h4>
+          <p>This task has been assigned based on your position as <strong>${assignedUser.position}</strong>.</p>
+          <p>Please prioritize according to your role responsibilities.</p>
         </div>
         
         <p>Please log in to the system to begin work.</p>
@@ -70,11 +102,8 @@ exports.createTask = async (req, res) => {
     `,
   });
 
-  // In-app notification
-  addNotification(
-    assignedUser.id,
-    `New task assigned to you as ${assignedUser.position}: ${title}`
-  );
+  // ✅ UPDATED: Use createTaskNotification instead of addNotification
+  await createTaskNotification(task, 'created');
 
   const populatedTask = await Task.findById(task._id)
     .populate('assignedTo', 'name email position') 
@@ -173,11 +202,8 @@ Completed At: ${task.completedAt.toDateString()}
 `,
       });
 
-      // In-app notification
-      addNotification(
-        adminUser.id,
-        `Task completed: ${task.title} by ${completedByUser.name}`
-      );
+      // ✅ UPDATED: Use createTaskNotification instead of addNotification
+      await createTaskNotification(task, 'completed');
     }
   }
 
@@ -189,8 +215,6 @@ Completed At: ${task.completedAt.toDateString()}
 
   res.json(populatedTask);
 };
-
-// Add these methods to your existing task.controller.js
 
 exports.getTaskById = async (req, res) => {
   try {
@@ -262,9 +286,13 @@ exports.updateTask = async (req, res) => {
         }
         
         // Notify old assignee
-        addNotification(
+        await addNotification(
           task.assignedTo,
-          `Task reassigned: ${task.title}`
+          `Task reassigned: ${task.title}`,
+          'task',
+          { taskId: task._id },
+          `/dashboard/tasks/${task._id}`,
+          'medium'
         );
         
         // Notify new assignee
@@ -298,9 +326,13 @@ exports.updateTask = async (req, res) => {
           `,
         });
 
-        addNotification(
+        await addNotification(
           newAssignee.id,
-          `Task reassigned to you as ${newAssignee.position}: ${task.title}`
+          `Task reassigned to you as ${newAssignee.position}: ${task.title}`,
+          'task',
+          { taskId: task._id },
+          `/dashboard/tasks/${task._id}`,
+          'medium'
         );
 
         task.assignedTo = assignedTo;
@@ -351,9 +383,13 @@ exports.deleteTask = async (req, res) => {
     // Notify assignee about task deletion
     const assignee = await User.findById(task.assignedTo);
     if (assignee) {
-      addNotification(
+      await addNotification(
         assignee.id,
-        `Task deleted: ${task.title}`
+        `Task deleted: ${task.title}`,
+        'task',
+        { taskId: task._id },
+        null,
+        'medium'
       );
     }
 

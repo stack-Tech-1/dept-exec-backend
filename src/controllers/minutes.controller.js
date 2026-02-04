@@ -1,8 +1,8 @@
-//C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\controllers\minutes.controller.js
+// C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\controllers\minutes.controller.js
 const generateMinutesPDF = require("../utils/minutesPdf");
 const Minutes = require("../models/minutes.model");
-
-
+const { extractTasksFromMinutes, createTasksFromExtraction } = require("../utils/taskExtractor");
+const { addNotification, createMinutesNotification } = require("../utils/notifications"); // UPDATED
 
 // Add these methods to your minutes.controller.js
 
@@ -127,6 +127,9 @@ exports.createMinutes = async (req, res) => {
     createdBy: req.user.id,
   });
 
+  // ✅ UPDATED: Use createMinutesNotification instead of addNotification
+  await createMinutesNotification(record, 'created');
+
   console.log(`📄 Meeting minutes created: ${title} by user ${req.user.id}`);
   
   res.status(201).json(record);
@@ -244,6 +247,10 @@ exports.updateMinutes = async (req, res) => {
   }
 
   await record.save();
+  
+  // ✅ UPDATED: Add notification for minutes update
+  await createMinutesNotification(record, 'updated');
+  
   console.log(`📝 Minutes updated: ${record.title} by user ${req.user.id}`);
   
   res.json(record);
@@ -279,10 +286,43 @@ exports.approveMinutes = async (req, res) => {
   
   await record.save();
 
+  // ✅ AUTO-TASK EXTRACTION: Extract and create tasks
+  try {
+    const extractedTasks = await extractTasksFromMinutes(
+      record.minutesText,
+      record._id,
+      req.user.id
+    );
+    
+    if (extractedTasks.length > 0) {
+      const createdTasks = await createTasksFromExtraction(extractedTasks);
+      
+      // Notify about auto-created tasks
+      for (const task of createdTasks) {
+        await addNotification(
+          task.assignedTo._id,
+          `New task auto-assigned from minutes: ${task.title}`,
+          'task',
+          { taskId: task._id, source: 'minutes', minutesId: record._id },
+          `/dashboard/tasks/${task._id}`,
+          'medium'
+        );
+      }
+      
+      console.log(`✅ Auto-created ${createdTasks.length} tasks from approved minutes`);
+    }
+  } catch (error) {
+    console.error("Auto-task extraction failed:", error);
+    // Don't fail the approval if extraction fails
+  }
+
+  // ✅ UPDATED: Use createMinutesNotification instead of addNotification
+  await createMinutesNotification(record, 'approved');
+
   console.log(`✅ Minutes approved: ${record.title} by user ${req.user.id}`);
   
   res.json({
-    message: "Minutes approved and locked",
+    message: "Minutes approved and tasks auto-created",
     minutes: record,
   });
 };

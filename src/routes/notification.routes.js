@@ -1,18 +1,22 @@
+// C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\routes\notification.routes.js
 const express = require("express");
-const { authenticate } = require("../middleware/auth.middleware");
-const { getUserNotifications, markAllAsRead } = require("../utils/notifications");
-
 const router = express.Router();
+const notificationController = require("../controllers/notification.controller");
+const { authenticate } = require("../middleware/auth.middleware");
 
-// Get my notifications
-router.get("/", authenticate, (req, res) => {
-  res.json(getUserNotifications(req.user.id));
-});
+// All routes require authentication
+router.use(authenticate);
 
-// Mark all as read
-router.patch("/read", authenticate, (req, res) => {
-  markAllAsRead(req.user.id);
-  res.json({ message: "Notifications marked as read" });
-});
+// Get user notifications
+router.get("/", notificationController.getUserNotifications);
+
+// Get unread count
+router.get("/unread-count", notificationController.getUnreadCount);
+
+// Mark notification as read
+router.patch("/:id/read", notificationController.markAsRead);
+
+// Mark all notifications as read
+router.patch("/read-all", notificationController.markAllAsRead);
 
 module.exports = router;

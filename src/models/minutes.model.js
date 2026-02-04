@@ -1,3 +1,4 @@
+//C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\models\minutes.model.js
 const mongoose = require("mongoose");
 
 const minutesSchema = new mongoose.Schema({
@@ -58,5 +59,6 @@ const minutesSchema = new mongoose.Schema({
 minutesSchema.index({ date: -1 });
 minutesSchema.index({ session: 1, semester: 1 });
 minutesSchema.index({ approved: 1 });
+minutesSchema.index({ title: 'text', minutesText: 'text', venue: 'text' });
 
 module.exports = mongoose.model("Minutes", minutesSchema);

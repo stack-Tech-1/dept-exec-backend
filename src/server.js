@@ -80,7 +80,7 @@ const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
 
 // Database connection
 const connectDB = require("./config/db");
-const startOverdueChecker = require("./utils/overdueChecker");
+const { startOverdueChecker } = require("./utils/overdueChecker");
 
 // ✅ SECURITY: Create uploads directory if it doesn't exist
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
@@ -132,16 +132,23 @@ const PORT = process.env.PORT || 5000;
 connectDB().then(() => {
   console.log("✅ Database connected successfully");
   
-  app.listen(PORT, () => {
+  const { initializeSocket } = require('./socket');
+
+  const server = app.listen(PORT, () => {
     console.log(`🚀 Server running in ${process.env.NODE_ENV || 'development'} mode`);
     console.log(`📍 Port: ${PORT}`);
-    console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL }`);
+    console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
     console.log(`📁 Uploads directory: ${path.join(__dirname, "uploads")}`);
+
+    // Initialize Socket.io
+    initializeSocket(server);
+    console.log('🔌 Socket.io initialized');
 
     // Start background services
     startOverdueChecker();
     console.log("⏰ Overdue task checker started");
   });
+
 }).catch(error => {
   console.error("❌ Failed to connect to database:", error);
   process.exit(1);

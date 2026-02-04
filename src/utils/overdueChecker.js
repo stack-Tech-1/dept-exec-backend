@@ -1,106 +1,112 @@
-const { sendEmail } = require("./mailer");
-const { addNotification } = require("./notifications");
-const Task = require("../models/task.model"); 
-const User = require("../models/user.model"); 
+// C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\utils\overdueChecker.js
+const Task = require('../models/task.model');
+const User = require('../models/user.model');
+const { addNotification, sendEmailNotification } = require('./notifications');
+const { getIO } = require('../socket');
 
-// ✅ UPDATED: Remove tasks parameter, fetch from DB directly
-function startOverdueChecker() {
-  console.log("⏰ Overdue task checker started");
+let checkerInterval;
 
-  setInterval(async () => {
-    try {
-      const now = new Date();
-      
-      // ✅ UPDATED: Find overdue tasks in database
-      const overdueTasks = await Task.find({
-        status: { $in: ["PENDING", "IN_PROGRESS"] },
-        dueDate: { $lt: now }
-      }).populate('assignedTo createdBy');
+const checkOverdueTasks = async () => {
+  try {
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
 
-      for (const task of overdueTasks) {
-        // Mark as overdue
-        task.status = "OVERDUE";
-        
-        // Add audit trail
+    // Find tasks that are due yesterday or before and not completed/overdue
+    const overdueTasks = await Task.find({
+      dueDate: { $lte: yesterday },
+      status: { $in: ['PENDING', 'IN_PROGRESS'] }
+    }).populate('assignedTo', 'name email position')
+      .populate('createdBy', 'name email');
+
+    for (const task of overdueTasks) {
+      // Update task status to OVERDUE
+      if (task.status !== 'OVERDUE') {
+        task.status = 'OVERDUE';
         task.statusHistory.push({
-          status: "OVERDUE",
-          changedBy: null, // system
-          changedAt: new Date(),
+          status: 'OVERDUE',
+          changedBy: 'system',
+          changedAt: now,
+          note: 'Auto-marked overdue by system'
         });
-
         await task.save();
 
-        console.log(`⚠️ Task overdue: ${task.title}`);
-
-        // Notify EXEC               
-          if (task.assignedTo && task.assignedTo.email) {
-            await sendEmail({
-              to: task.assignedTo.email,
-              subject: `⚠️ Task Marked Overdue: ${task.title}`,
-              html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="background: linear-gradient(to right, #f59e0b, #d97706); padding: 20px; text-align: center; color: white;">
-                  <h2>Task Overdue Notice</h2>
-                </div>
-                <div style="padding: 20px; background: white;">
-                  <p>Hello <strong>${task.assignedTo.name}</strong>,</p>
-                  <p>One of your tasks has been marked as <strong style="color: #dc2626;">OVERDUE</strong>:</p>
-                  
-                  <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0;">
-                    <h3 style="margin-top: 0; color: #92400e;">${task.title}</h3>
-                    <p><strong>Description:</strong> ${task.description || 'No description provided'}</p>
-                    <p><strong>Due Date:</strong> ${new Date(task.dueDate).toLocaleDateString()}</p>
-                    <p><strong>Priority:</strong> ${task.priority}</p>
-                    <p><strong>Assigned By:</strong> ${task.createdBy?.name || 'System'}</p>
-                  </div>
-                  
-                  <p>Please log in to update the task status or request an extension.</p>
-                  <p><em>– Department Executive System</em></p>
-                </div>
-              </div>
-              `,
-            });
-
-          // In-app notification
-          addNotification(
+        // Send email notification to assignee
+        if (task.assignedTo.email) {
+          await sendEmailNotification(
             task.assignedTo._id,
-            `Task overdue: ${task.title}`
+            `⚠️ Task Overdue: ${task.title}`,
+            `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background: #dc3545; padding: 20px; text-align: center; color: white;">
+                <h2>Task Overdue</h2>
+              </div>
+              <div style="padding: 20px; background: white;">
+                <p>Hello <strong>${task.assignedTo.position} ${task.assignedTo.name}</strong>,</p>
+                <p>The following task is now overdue:</p>
+                
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #dc3545;">
+                  <h3 style="margin-top: 0;">${task.title}</h3>
+                  <p><strong>Due Date:</strong> ${task.dueDate.toLocaleDateString()} (OVERDUE)</p>
+                  <p><strong>Priority:</strong> <span style="color: #dc3545">${task.priority}</span></p>
+                  <p><strong>Original Assigner:</strong> ${task.createdBy?.name}</p>
+                </div>
+                
+                <p style="color: #dc3545; font-weight: bold;">
+                  ⚠️ This task requires immediate attention!
+                </p>
+                
+                <p>Please update the task status or contact ${task.createdBy?.name} for extension.</p>
+                <p><em>– Department Executive System</em></p>
+              </div>
+            </div>
+            `
           );
         }
 
-        // Notify ADMIN
-        if (task.createdBy) {
-          // Email notification
-          await sendEmail({
-            to: task.createdBy.email,
-            subject: "⚠️ Task Marked as Overdue",
-            text: `
-Hello ${task.createdBy.name},
-
-The following task has been marked as OVERDUE:
-
-Task: ${task.title}
-Assigned To: ${task.assignedTo?.name || "Unknown"}
-
-– Dept Exec System
-`,
-          });
-
-          // In-app notification
+        // Send notification to creator
+        if (task.createdBy && task.createdBy._id.toString() !== task.assignedTo._id.toString()) {
           addNotification(
             task.createdBy._id,
-            `Task overdue: ${task.title} (assigned to ${task.assignedTo?.name})`
+            `Task overdue: "${task.title}" assigned to ${task.assignedTo.name}`
           );
         }
-      }
 
-      if (overdueTasks.length > 0) {
-        console.log(`✅ Processed ${overdueTasks.length} overdue tasks`);
+        // Real-time notification via Socket.io
+        const io = getIO();
+        io.to(`user-${task.assignedTo._id}`).emit('task-overdue', {
+          taskId: task._id,
+          title: task.title,
+          dueDate: task.dueDate
+        });
+
+        console.log(`⚠️ Marked task as overdue: ${task.title} (ID: ${task._id})`);
       }
-    } catch (error) {
-      console.error("❌ Overdue checker error:", error);
     }
-  }, 60 * 1000); 
-}
 
-module.exports = startOverdueChecker;
+    if (overdueTasks.length > 0) {
+      console.log(`✅ Checked ${overdueTasks.length} overdue tasks`);
+    }
+  } catch (error) {
+    console.error('Overdue checker error:', error);
+  }
+};
+
+const startOverdueChecker = () => {
+  // Run immediately on start
+  checkOverdueTasks();
+  
+  // Then run every hour
+  checkerInterval = setInterval(checkOverdueTasks, 60 * 60 * 1000);
+  
+  console.log('⏰ Overdue task checker started (running hourly)');
+};
+
+const stopOverdueChecker = () => {
+  if (checkerInterval) {
+    clearInterval(checkerInterval);
+    console.log('⏰ Overdue task checker stopped');
+  }
+};
+
+module.exports = { startOverdueChecker, stopOverdueChecker, checkOverdueTasks };

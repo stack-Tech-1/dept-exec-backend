@@ -83,6 +83,7 @@ meetingSchema.index({ date: 1 });
 meetingSchema.index({ createdBy: 1 });
 meetingSchema.index({ "attendees.userId": 1 });
 meetingSchema.index({ meetingType: 1 });
+meetingSchema.index({ title: 'text', agenda: 'text', venue: 'text' }); // MOVED HERE - AFTER schema definition
 
 // Virtual for checking if meeting is upcoming
 meetingSchema.virtual("isUpcoming").get(function() {

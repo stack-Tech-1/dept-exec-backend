@@ -1,3 +1,4 @@
+//C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\models\user.model.js
 const mongoose = require("mongoose");
 
 // Define executive positions
@@ -63,6 +64,13 @@ const EXECUTIVE_POSITIONS = [
     }
   }, { 
     timestamps: true 
+  });
+
+  userSchema.index({
+    name: 'text',
+    email: 'text',
+    position: 'text',
+    department: 'text'
   });
 
   module.exports = mongoose.model("User", userSchema);
