@@ -1,3 +1,4 @@
+//C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\controllers\user.controller.js
 const User = require('../models/user.model');
 
 // Get all users (Admin only)
@@ -76,32 +77,42 @@ exports.getCurrentUser = async (req, res) => {
 // Update current user profile
 exports.updateCurrentUser = async (req, res) => {
   try {
-    const { name, department, position } = req.body;
-    const updates = {};
+    const { name, bio, phone, department } = req.body;
 
-    if (name) updates.name = name;
-    if (department) updates.department = department;
-    if (position) updates.position = position;
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
 
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { $set: updates },
-      { new: true, select: '-password -resetToken -resetTokenExpiry' }
-    );
+    // Update allowed fields
+    if (name !== undefined) user.name = name;
+    if (bio !== undefined) user.bio = bio;
+    if (phone !== undefined) user.phone = phone;
+    if (department !== undefined) user.department = department;
 
-    res.json({ 
-      success: true, 
-      message: 'Profile updated successfully',
-      user 
+    await user.save();
+
+    const userWithoutPassword = await User.findById(user._id)
+      .select('-password -resetToken -resetTokenExpiry');
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      user: userWithoutPassword
     });
+
   } catch (error) {
-    console.error('Error updating profile:', error);
+    console.error("Update profile error:", error);
     res.status(500).json({ 
-      success: false, 
-      message: 'Server error updating profile' 
+      success: false,
+      message: "Server error updating profile" 
     });
   }
 };
+
 
 // Update user (Admin or user themselves)
 exports.updateUser = async (req, res) => {
