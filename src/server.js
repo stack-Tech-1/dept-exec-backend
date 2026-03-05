@@ -3,9 +3,11 @@ require('dotenv').config();
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
+const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const path = require("path");
 const fs = require("fs");
+const mongoose = require("mongoose");
 
 const app = express();
 app.set('trust proxy', 1);
@@ -43,8 +45,8 @@ app.use(cors(corsOptions));
 // Add this for preflight requests
 app.options('*', cors(corsOptions));
 
-// ✅ FIXED: Handle preflight for API routes only (not wildcard)
-//app.options('/api/*', cors(corsOptions));
+// Request logging
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // ✅ SECURITY: JSON body parsing with size limit
 app.use(express.json({ limit: "10kb" }));
@@ -91,14 +93,16 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   }
 }
 
-// Serve static files (uploaded recordings)
-app.use("/uploads", express.static(path.join(__dirname, "uploads"), {
-  setHeaders: (res, path) => {
-    // Security headers for static files
-    res.set("X-Content-Type-Options", "nosniff");
-    res.set("Content-Disposition", "attachment"); // Force download for security
-  }
-}));
+// Serve static files (uploaded recordings) — only when the directory exists
+const uploadsPath = path.join(__dirname, "uploads");
+if (fs.existsSync(uploadsPath)) {
+  app.use("/uploads", express.static(uploadsPath, {
+    setHeaders: (res) => {
+      res.set("X-Content-Type-Options", "nosniff");
+      res.set("Content-Disposition", "attachment");
+    }
+  }));
+}
 
 
 // ✅ FIXED: Root Route to stop Render's 404 logs
@@ -141,7 +145,7 @@ connectDB().then(() => {
     console.log(`📁 Uploads directory: ${path.join(__dirname, "uploads")}`);
 
     // Initialize Socket.io
-    initializeSocket(server);
+    initializeSocket(server, corsOptions);
     console.log('🔌 Socket.io initialized');
 
     // Start background services
@@ -149,12 +153,26 @@ connectDB().then(() => {
     console.log("⏰ Overdue task checker started");
   });
 
+  // 404 and error handlers — registered after all routes
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+
+  // Graceful shutdown
+  const shutdown = (signal) => {
+    console.log(`\n${signal} received. Shutting down gracefully...`);
+    server.close(() => {
+      console.log('HTTP server closed');
+      mongoose.connection.close().then(() => {
+        console.log('Database connection closed');
+        process.exit(0);
+      });
+    });
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
 }).catch(error => {
   console.error("❌ Failed to connect to database:", error);
   process.exit(1);
 });
-
-// ✅ SECURITY: 404 Handler (must be before errorHandler)
-app.use(notFoundHandler);
-// ✅ SECURITY: Global error handler (must be last)
-app.use(errorHandler);
