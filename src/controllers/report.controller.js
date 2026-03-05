@@ -716,7 +716,7 @@ exports.exportReport = async (req, res) => {
         return res.status(403).json({ message: "Admins only" });
       }
   
-      const { type } = req.params;
+      const type = req.params.reportType || req.params.type;
       const { format = 'pdf' } = req.query;
   
       if (!['tasks', 'meetings', 'goals', 'department'].includes(type)) {
@@ -810,6 +810,63 @@ exports.exportReport = async (req, res) => {
     }
   };
   
+exports.getDashboardSummary = async (req, res) => {
+  try {
+    const now = new Date();
+
+    const [
+      tasksByStatus,
+      totalUsers,
+      activeUsers,
+      goalsByStatus,
+      upcomingMeetingsCount,
+      overdueTasks
+    ] = await Promise.all([
+      Task.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+      User.countDocuments(),
+      User.countDocuments({ isActive: true }),
+      Goal.aggregate([{ $match: { isArchived: false } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Meeting.countDocuments({ date: { $gte: now } }),
+      Task.countDocuments({ status: 'OVERDUE' })
+    ]);
+
+    const taskStats = tasksByStatus.reduce((acc, cur) => {
+      acc[cur._id] = cur.count;
+      return acc;
+    }, {});
+
+    const goalStats = goalsByStatus.reduce((acc, cur) => {
+      acc[cur._id] = cur.count;
+      return acc;
+    }, {});
+
+    res.json({
+      tasks: {
+        total: Object.values(taskStats).reduce((a, b) => a + b, 0),
+        pending: taskStats.PENDING || 0,
+        inProgress: taskStats.IN_PROGRESS || 0,
+        completed: taskStats.COMPLETED || 0,
+        overdue: taskStats.OVERDUE || 0,
+      },
+      users: {
+        total: totalUsers,
+        active: activeUsers,
+      },
+      goals: {
+        total: Object.values(goalStats).reduce((a, b) => a + b, 0),
+        completed: goalStats.completed || 0,
+        inProgress: goalStats['in-progress'] || 0,
+        atRisk: goalStats['at-risk'] || 0,
+      },
+      upcomingMeetings: upcomingMeetingsCount,
+      overdueTasks,
+    });
+  } catch (error) {
+    console.error('Get dashboard summary error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
   // Helper method for department report data
   exports.getDepartmentReportData = async () => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);

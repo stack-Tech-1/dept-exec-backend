@@ -70,6 +70,10 @@ const meetingSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  approved: {
+    type: Boolean,
+    default: false,
+  },
   reminderSent: {
     type: Boolean,
     default: false,

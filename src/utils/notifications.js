@@ -22,7 +22,8 @@ exports.addNotification = async (userId, message, type = 'info', data = {}, acti
       id: notification._id,
       message,
       type,
-      data,
+      metadata: data,
+      read: false,
       actionUrl,
       priority,
       createdAt: notification.createdAt

@@ -23,7 +23,10 @@ router.get("/users/:userId", reportController.getUserPerformance);
 // Department report (admin only)
 router.get("/department", authorize(["ADMIN"]), reportController.getDepartmentReport);
 
+// Dashboard summary (all-in-one stats)
+router.get("/dashboard-summary", reportController.getDashboardSummary);
+
 // Export reports (admin only)
-//router.get("/export/:type", authorize(["ADMIN"]), reportController.exportReport);
+router.get("/export/:reportType", authorize(["ADMIN"]), reportController.exportReport);
 
 module.exports = router;

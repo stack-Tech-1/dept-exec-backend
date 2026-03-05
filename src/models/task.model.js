@@ -47,6 +47,13 @@ const taskSchema = new mongoose.Schema({
 
   completedAt: Date,
 
+  progress: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100,
+  },
+
   priority: {
     type: String,
     enum: ["LOW", "MEDIUM", "HIGH"],

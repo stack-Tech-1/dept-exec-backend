@@ -10,7 +10,7 @@ exports.createMeeting = async (req, res) => {
       return res.status(403).json({ message: "Admins only" });
     }
 
-    const { title, date, time, venue, agenda, zoomLink, meetingType, rsvpDeadline, session, semester } = req.body;
+    const { title, date, time, venue, agenda, zoomLink, meetingType, rsvpDeadline, session, semester, attendees: attendeeIds } = req.body;
 
     if (!title || !date || !time || !venue) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -36,17 +36,18 @@ exports.createMeeting = async (req, res) => {
       createdBy: req.user.id,
     });
 
-    // Get all executives to add as attendees
-    const executives = await User.find({ role: "EXEC", isActive: true });
-    
-    // Add all executives as attendees
+    // Use provided attendees or fall back to all active execs
+    const executives = attendeeIds?.length
+      ? await User.find({ _id: { $in: attendeeIds }, isActive: true })
+      : await User.find({ role: "EXEC", isActive: true });
+
     for (const exec of executives) {
       meeting.addAttendee(exec._id, exec.name, exec.position);
     }
-    
+
     await meeting.save();
 
-    // Send email notifications to all executives
+    // Send email notifications
     for (const exec of executives) {
       await sendEmail({
         to: exec.email,
@@ -86,8 +87,7 @@ exports.createMeeting = async (req, res) => {
     }
 
     const populatedMeeting = await Meeting.findById(meeting._id)
-      .populate('createdBy', 'name email position')
-      .populate('attendees.userId', 'name email position');
+      .populate('createdBy', 'name email');
 
     res.status(201).json(populatedMeeting);
 
@@ -100,8 +100,7 @@ exports.createMeeting = async (req, res) => {
 exports.getAllMeetings = async (req, res) => {
   try {
     const meetings = await Meeting.find()
-      .populate('createdBy', 'name email position')
-      .populate('attendees.userId', 'name email position')
+      .populate('createdBy', 'name email')
       .sort({ date: 1, time: 1 });
 
     res.json(meetings);
@@ -127,8 +126,7 @@ exports.getUpcomingMeetings = async (req, res) => {
         }
       ]
     })
-      .populate('createdBy', 'name email position')
-      .populate('attendees.userId', 'name email position')
+      .populate('createdBy', 'name email')
       .sort({ date: 1, time: 1 })
       .limit(limit);
 
@@ -145,17 +143,16 @@ exports.getUpcomingMeetings = async (req, res) => {
 exports.getMeetingById = async (req, res) => {
     try {
       const meeting = await Meeting.findById(req.params.id)
-        .populate('createdBy', 'name email position')
-        .populate('attendees.userId', 'name email position')
+        .populate('createdBy', 'name email')
         .populate('minutesId');
-  
+
       if (!meeting) {
         return res.status(404).json({ message: "Meeting not found" });
       }
-  
+
       // Check if user is an attendee or admin
       const isAttendee = meeting.attendees.some(
-        attendee => attendee.userId._id.toString() === req.user.id
+        attendee => attendee.userId.toString() === req.user.id.toString()
       );
       
       if (req.user.role !== "ADMIN" && !isAttendee) {
@@ -177,44 +174,22 @@ exports.getMeetingById = async (req, res) => {
       const now = new Date();
   
       // Get meetings where user is an attendee
-      const meetings = await Meeting.find({
-        "attendees.userId": userId
-      })
-        .populate('createdBy', 'name email position')
-        .populate('attendees.userId', 'name email position')
+      const meetings = await Meeting.find({ "attendees.userId": userId })
+        .populate('createdBy', 'name email')
         .sort({ date: 1, time: 1 });
-  
-      // Separate upcoming and past meetings
-      const upcomingMeetings = meetings.filter(meeting => {
-        const meetingDateTime = new Date(`${meeting.date.toISOString().split('T')[0]}T${meeting.time}`);
-        return meetingDateTime > now;
-      });
-  
-      const pastMeetings = meetings.filter(meeting => {
-        const meetingDateTime = new Date(`${meeting.date.toISOString().split('T')[0]}T${meeting.time}`);
-        return meetingDateTime <= now;
-      });
-  
-      // Get user's RSVP status for each meeting
+
+      // Attach current user's RSVP status to each meeting
       const meetingsWithRSVP = meetings.map(meeting => {
         const userAttendance = meeting.attendees.find(
-          attendee => attendee.userId._id.toString() === userId
+          attendee => attendee.userId.toString() === userId.toString()
         );
-        
         return {
           ...meeting.toObject(),
           userRSVP: userAttendance ? userAttendance.status : 'pending'
         };
       });
-  
-      res.json({
-        total: meetings.length,
-        upcoming: upcomingMeetings.length,
-        past: pastMeetings.length,
-        meetings: meetingsWithRSVP,
-        upcomingMeetings,
-        pastMeetings
-      });
+
+      res.json(meetingsWithRSVP);
   
     } catch (error) {
       console.error("Get user meetings error:", error);
@@ -309,10 +284,9 @@ exports.getMeetingById = async (req, res) => {
       await meeting.save();
   
       const populatedMeeting = await Meeting.findById(meeting._id)
-        .populate('createdBy', 'name email position')
-        .populate('attendees.userId', 'name email position')
+        .populate('createdBy', 'name email')
         .populate('minutesId');
-  
+
       res.json(populatedMeeting);
   
     } catch (error) {
@@ -417,15 +391,12 @@ exports.updateRSVP = async (req, res) => {
       const user = await User.findById(userId);
       addNotification(
         meeting.createdBy,
-        `${user.name} (${user.position}) is ${status} the meeting: ${meeting.title}`
+        `${user.name} (${user.position}) is ${status} the meeting: ${meeting.title}`,
+        'meeting'
       );
     }
 
-    const populatedMeeting = await Meeting.findById(meeting._id)
-      .populate('createdBy', 'name email position')
-      .populate('attendees.userId', 'name email position');
-
-    res.json(populatedMeeting);
+    res.json({ message: 'RSVP updated successfully' });
 
   } catch (error) {
     console.error("Update RSVP error:", error);
@@ -458,7 +429,7 @@ exports.getMeetingStatistics = async (req, res) => {
     ]);
 
     // Calculate overall attendance rate
-    const allMeetings = await Meeting.find().populate('attendees.userId');
+    const allMeetings = await Meeting.find();
     let totalAttendees = 0;
     let totalResponses = 0;
 
@@ -513,11 +484,7 @@ exports.linkMinutes = async (req, res) => {
     meeting.minutesId = minutesId;
     await meeting.save();
 
-    const populatedMeeting = await Meeting.findById(meeting._id)
-      .populate('createdBy', 'name email position')
-      .populate('minutesId');
-
-    res.json(populatedMeeting);
+    res.json({ message: 'Minutes linked to meeting successfully' });
 
   } catch (error) {
     console.error("Link minutes error:", error);

@@ -14,7 +14,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["info", "success", "warning", "error", "task", "meeting", "minutes"],
+    enum: ["task", "meeting", "system", "alert", "info", "success", "warning", "error", "minutes"],
     default: "info"
   },
   data: {
@@ -61,6 +61,19 @@ notificationSchema.virtual("relativeTime").get(function() {
   if (diffHour < 24) return `${diffHour}h ago`;
   if (diffDay < 7) return `${diffDay}d ago`;
   return this.createdAt.toLocaleDateString();
+});
+
+// Serialize data as metadata to match frontend contract
+notificationSchema.set('toJSON', {
+  virtuals: true,
+  transform: (doc, ret) => {
+    ret.id = ret._id?.toString();
+    ret.metadata = ret.data || {};
+    delete ret.data;
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  }
 });
 
 // Method to mark as read

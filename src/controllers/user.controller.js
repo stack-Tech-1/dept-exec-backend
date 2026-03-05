@@ -1,4 +1,5 @@
 //C:\Users\SMC\Documents\GitHub\dept-exec-backend\src\controllers\user.controller.js
+const bcrypt = require('bcryptjs');
 const User = require('../models/user.model');
 
 // Get all users (Admin only)
@@ -8,11 +9,7 @@ exports.getAllUsers = async (req, res) => {
     const users = await User.find({}, '-password -resetToken -resetTokenExpiry')
       .sort({ createdAt: -1 });
 
-    res.json({
-      success: true,
-      count: users.length,
-      users
-    });
+    res.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ 
@@ -42,7 +39,7 @@ exports.getUserById = async (req, res) => {
       });
     }
 
-    res.json({ success: true, user });
+    res.json(user);
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ 
@@ -64,7 +61,7 @@ exports.getCurrentUser = async (req, res) => {
       });
     }
 
-    res.json({ success: true, user });
+    res.json(user);
   } catch (error) {
     console.error('Error fetching current user:', error);
     res.status(500).json({ 
@@ -98,11 +95,7 @@ exports.updateCurrentUser = async (req, res) => {
     const userWithoutPassword = await User.findById(user._id)
       .select('-password -resetToken -resetTokenExpiry');
 
-    res.json({
-      success: true,
-      message: "Profile updated successfully",
-      user: userWithoutPassword
-    });
+    res.json(userWithoutPassword);
 
   } catch (error) {
     console.error("Update profile error:", error);
@@ -158,11 +151,7 @@ exports.updateUser = async (req, res) => {
       { new: true, select: '-password -resetToken -resetTokenExpiry' }
     );
 
-    res.json({ 
-      success: true, 
-      message: 'User updated successfully',
-      user: updatedUser 
-    });
+    res.json(updatedUser);
   } catch (error) {
     console.error('Error updating user:', error);
     
@@ -203,26 +192,122 @@ exports.deleteUser = async (req, res) => {
 
     // Check if user is the last admin
     if (user.role === 'ADMIN') {
-      const adminCount = await User.countDocuments({ role: 'ADMIN' });
+      const adminCount = await User.countDocuments({ role: 'ADMIN', isActive: true });
       if (adminCount <= 1) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Cannot delete the last admin user' 
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot deactivate the last admin user'
         });
       }
     }
 
-    await User.findByIdAndDelete(userId);
+    user.isActive = false;
+    await user.save();
 
-    res.json({ 
-      success: true, 
-      message: 'User deleted successfully' 
-    });
+    res.json({ message: 'User deactivated successfully' });
   } catch (error) {
-    console.error('Error deleting user:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error deleting user' 
-    });
+    console.error('Error deactivating user:', error);
+    res.status(500).json({ message: 'Server error deactivating user' });
+  }
+};
+
+// Reactivate user (Admin only) — returns updated User
+exports.reactivateUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    user.isActive = true;
+    await user.save();
+
+    const updated = await User.findById(user._id).select('-password -resetToken -resetTokenExpiry');
+    res.json(updated);
+  } catch (error) {
+    console.error('Error reactivating user:', error);
+    res.status(500).json({ success: false, message: 'Server error reactivating user' });
+  }
+};
+
+// Change password — accepts oldPassword (spec) or currentPassword (legacy)
+exports.changePassword = async (req, res) => {
+  try {
+    const { oldPassword, currentPassword, newPassword } = req.body;
+    const existingPassword = oldPassword || currentPassword;
+
+    if (!existingPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    }
+
+    const user = await User.findById(req.user.id);
+    const match = await bcrypt.compare(existingPassword, user.password);
+    if (!match) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ message: 'Server error changing password' });
+  }
+};
+
+// Get user statistics (Admin only)
+exports.getUserStatistics = async (req, res) => {
+  try {
+    const [total, active, admins, execs, byPositionRaw] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ isActive: true }),
+      User.countDocuments({ role: 'ADMIN' }),
+      User.countDocuments({ role: 'EXEC' }),
+      User.aggregate([{ $group: { _id: '$position', count: { $sum: 1 } } }])
+    ]);
+
+    const byPosition = byPositionRaw.reduce((acc, cur) => {
+      acc[cur._id] = cur.count;
+      return acc;
+    }, {});
+
+    res.json({ total, active, admins, execs, byPosition });
+  } catch (error) {
+    console.error('Error fetching user statistics:', error);
+    res.status(500).json({ message: 'Server error fetching statistics' });
+  }
+};
+
+// Search users
+exports.searchUsers = async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query) return res.json([]);
+
+    const users = await User.find(
+      { $text: { $search: query }, isActive: true },
+      '-password -resetToken -resetTokenExpiry'
+    ).limit(20);
+
+    res.json(users);
+  } catch (error) {
+    // Fall back to regex search if text index unavailable
+    try {
+      const { query } = req.query;
+      const regex = new RegExp(query, 'i');
+      const users = await User.find(
+        { $or: [{ name: regex }, { email: regex }, { position: regex }], isActive: true },
+        '-password -resetToken -resetTokenExpiry'
+      ).limit(20);
+      res.json(users);
+    } catch (fallbackError) {
+      console.error('Search users error:', fallbackError);
+      res.status(500).json({ message: 'Server error searching users' });
+    }
   }
 };
