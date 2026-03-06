@@ -432,22 +432,22 @@ exports.uploadAttachment = async (req, res) => {
 
     await task.save();
 
-    const admin = await User.findById(task.createdBy);
-    if (admin) {
-      await sendEmail({
+    User.findById(task.createdBy).then(admin => {
+      if (!admin) return;
+      sendEmail({
         to: admin.email,
         subject: `📎 New attachment on task: ${task.title}`,
         text: `${req.user.name} uploaded a file (${req.file.originalname}) on task "${task.title}". Log in to review it.`
-      });
-      await addNotification(
+      }).catch(err => console.error('Upload notification email failed:', err.message));
+      addNotification(
         admin._id,
         `${req.user.name} uploaded a file on task: ${task.title}`,
         'task',
         { taskId: task._id },
         `/dashboard/tasks/${task._id}`,
         'medium'
-      );
-    }
+      ).catch(err => console.error('Notification failed:', err.message));
+    }).catch(() => {});
 
     res.json({ message: 'File uploaded successfully', task });
   } catch (error) {
@@ -481,14 +481,14 @@ exports.addComment = async (req, res) => {
       ? task.assignedTo
       : task.createdBy;
 
-    await addNotification(
+    addNotification(
       notifyUserId,
       `New comment on task "${task.title}" by ${req.user.name}`,
       'task',
       { taskId: task._id },
       `/dashboard/tasks/${task._id}`,
       'low'
-    );
+    ).catch(err => console.error('Notification failed:', err.message));
 
     const populated = await Task.findById(task._id)
       .populate('comments.author', 'name position');

@@ -47,12 +47,8 @@ exports.sendEmail = async ({ to, subject, html, text }) => {
       console.error("❌ Authentication failed. Check email/password.");
     } else if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
       console.error("❌ Connection failed. Check network/firewall.");
-      console.error("❌ Trying alternative configuration...");
-      
-      // Try alternative config
-      await tryAlternativeConfig({ to, subject, text });
     }
-    
-    return null;
+
+    return { success: false, error: error.message };
   }
 };
