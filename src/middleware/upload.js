@@ -2,6 +2,7 @@
 const multer = require("multer");
 const path = require("path");
 const crypto = require("crypto");
+const fs = require("fs");
 
 // Configure storage
 const storage = multer.diskStorage({
@@ -46,4 +47,39 @@ const upload = multer({
   }
 });
 
+// Task attachment upload config
+const taskUploadPath = path.join(__dirname, '..', 'uploads', 'tasks');
+if (!fs.existsSync(taskUploadPath)) fs.mkdirSync(taskUploadPath, { recursive: true });
+
+const taskStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, taskUploadPath),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = crypto.randomBytes(8).toString('hex');
+    const ext = path.extname(file.originalname);
+    cb(null, `task-${Date.now()}-${uniqueSuffix}${ext}`);
+  }
+});
+
+const taskFileFilter = (req, file, cb) => {
+  const allowed = [
+    'image/jpeg', 'image/png',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  ];
+  if (!allowed.includes(file.mimetype)) {
+    return cb(new Error('Invalid file type for task attachment'), false);
+  }
+  cb(null, true);
+};
+
+const taskUpload = multer({
+  storage: taskStorage,
+  fileFilter: taskFileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
 module.exports = upload;
+module.exports.taskUpload = taskUpload;

@@ -10,7 +10,8 @@ const allowedTransitions = {
   PENDING: ["IN_PROGRESS"],
   IN_PROGRESS: ["COMPLETED"],
   OVERDUE: ["IN_PROGRESS", "COMPLETED"],
-  COMPLETED: [] // No transitions from completed
+  COMPLETED: ["VERIFIED"],
+  VERIFIED: []
 };
 
 exports.createTask = async (req, res) => {
@@ -150,13 +151,6 @@ exports.updateTaskStatus = async (req, res) => {
   if (status === "OVERDUE") {
     return res.status(403).json({ 
       message: "OVERDUE status can only be set automatically by the system" 
-    });
-  }
-
-  // ✅ HARDENED: Lock completed tasks (no modifications)
-  if (task.status === "COMPLETED") {
-    return res.status(400).json({
-      message: "Completed tasks cannot be modified",
     });
   }
 
@@ -405,6 +399,182 @@ exports.deleteTask = async (req, res) => {
   } catch (error) {
     console.error("Delete task error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// Upload attachment — assignee or admin
+exports.uploadAttachment = async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    if (req.user.role === 'EXEC' && task.assignedTo.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'You can only upload to your own tasks' });
+    }
+
+    if (task.status === 'VERIFIED') {
+      return res.status(400).json({ message: 'Cannot upload to a verified task' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    task.attachments.push({
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      url: `/uploads/tasks/${req.file.filename}`,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      uploadedBy: req.user.id,
+      uploadedAt: new Date()
+    });
+
+    await task.save();
+
+    const admin = await User.findById(task.createdBy);
+    if (admin) {
+      await sendEmail({
+        to: admin.email,
+        subject: `📎 New attachment on task: ${task.title}`,
+        text: `${req.user.name} uploaded a file (${req.file.originalname}) on task "${task.title}". Log in to review it.`
+      });
+      await addNotification(
+        admin._id,
+        `${req.user.name} uploaded a file on task: ${task.title}`,
+        'task',
+        { taskId: task._id },
+        `/dashboard/tasks/${task._id}`,
+        'medium'
+      );
+    }
+
+    res.json({ message: 'File uploaded successfully', task });
+  } catch (error) {
+    console.error('Upload attachment error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Add comment — admin or assignee
+exports.addComment = async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ message: 'Comment text is required' });
+
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    if (req.user.role === 'EXEC' && task.assignedTo.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    task.comments.push({
+      text: text.trim(),
+      author: req.user.id,
+      createdAt: new Date()
+    });
+
+    await task.save();
+
+    const notifyUserId = req.user.id === task.createdBy.toString()
+      ? task.assignedTo
+      : task.createdBy;
+
+    await addNotification(
+      notifyUserId,
+      `New comment on task "${task.title}" by ${req.user.name}`,
+      'task',
+      { taskId: task._id },
+      `/dashboard/tasks/${task._id}`,
+      'low'
+    );
+
+    const populated = await Task.findById(task._id)
+      .populate('comments.author', 'name position');
+
+    res.json({ message: 'Comment added', comments: populated.comments });
+  } catch (error) {
+    console.error('Add comment error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Update progress — assignee only
+exports.updateProgress = async (req, res) => {
+  try {
+    const { progress } = req.body;
+
+    if (progress === undefined || progress < 0 || progress > 100) {
+      return res.status(400).json({ message: 'Progress must be between 0 and 100' });
+    }
+
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    if (req.user.role === 'EXEC' && task.assignedTo.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'You can only update progress on your own tasks' });
+    }
+
+    if (task.status === 'VERIFIED') {
+      return res.status(400).json({ message: 'Cannot update a verified task' });
+    }
+
+    task.progress = progress;
+    await task.save();
+
+    res.json({ message: 'Progress updated', progress: task.progress });
+  } catch (error) {
+    console.error('Update progress error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Verify task — admin only
+exports.verifyTask = async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id)
+      .populate('assignedTo', 'name email position')
+      .populate('createdBy', 'name email position');
+
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    if (task.status !== 'COMPLETED') {
+      return res.status(400).json({ message: 'Only COMPLETED tasks can be verified' });
+    }
+
+    task.status = 'VERIFIED';
+    task.verifiedBy = req.user.id;
+    task.verifiedAt = new Date();
+    task.progress = 100;
+
+    task.statusHistory.push({
+      status: 'VERIFIED',
+      changedBy: req.user.id,
+      changedAt: new Date()
+    });
+
+    await task.save();
+
+    await sendEmail({
+      to: task.assignedTo.email,
+      subject: `✅ Task Verified: ${task.title}`,
+      text: `Hello ${task.assignedTo.name},\n\nYour task "${task.title}" has been reviewed and verified by ${req.user.name} (${req.user.position}).\n\nWell done!\n\n– IESA Exec System`
+    });
+
+    await addNotification(
+      task.assignedTo._id,
+      `Your task "${task.title}" has been verified by ${req.user.name}`,
+      'task',
+      { taskId: task._id },
+      `/dashboard/tasks/${task._id}`,
+      'high'
+    );
+
+    res.json({ message: 'Task verified successfully', task });
+  } catch (error) {
+    console.error('Verify task error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 

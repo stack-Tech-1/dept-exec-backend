@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const taskController = require("../controllers/task.controller");
 const { authenticate, authorize } = require("../middleware/auth.middleware");
+const upload = require('../middleware/upload').taskUpload;
 
 // All routes require authentication
 router.use(authenticate);
@@ -24,5 +25,17 @@ router.patch("/:id/status", taskController.updateTaskStatus);
 
 // Delete task (Admin only)
 router.delete("/:id", authorize(["ADMIN"]), taskController.deleteTask);
+
+// Upload attachment (assignee only)
+router.post('/:id/attachments', upload.single('file'), taskController.uploadAttachment);
+
+// Add comment (admin or assignee)
+router.post('/:id/comments', taskController.addComment);
+
+// Update progress percentage (assignee only)
+router.patch('/:id/progress', taskController.updateProgress);
+
+// Verify task completion (admin only)
+router.post('/:id/verify', authorize(['ADMIN']), taskController.verifyTask);
 
 module.exports = router;

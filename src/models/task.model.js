@@ -26,7 +26,7 @@ const taskSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["PENDING", "IN_PROGRESS", "COMPLETED", "OVERDUE"],
+    enum: ["PENDING", "IN_PROGRESS", "COMPLETED", "OVERDUE", "VERIFIED"],
     default: "PENDING",
   },
   updateHistory: [{
@@ -64,7 +64,7 @@ const taskSchema = new mongoose.Schema({
     {
       status: {
         type: String,
-        enum: ["PENDING", "IN_PROGRESS", "COMPLETED", "OVERDUE"],
+        enum: ["PENDING", "IN_PROGRESS", "COMPLETED", "OVERDUE", "VERIFIED"],
         required: true
       },
       changedBy: { 
@@ -79,8 +79,29 @@ const taskSchema = new mongoose.Schema({
       _id: false // Don't create IDs for subdocuments
     }
   ],
-}, { 
-  timestamps: true 
+
+  attachments: [{
+    filename: { type: String, required: true },
+    originalName: { type: String, required: true },
+    url: { type: String, required: true },
+    mimetype: { type: String },
+    size: { type: Number },
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    uploadedAt: { type: Date, default: Date.now },
+    _id: false
+  }],
+
+  comments: [{
+    text: { type: String, required: true },
+    author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    createdAt: { type: Date, default: Date.now },
+    _id: false
+  }],
+
+  verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  verifiedAt: Date,
+}, {
+  timestamps: true
 });
 
 // Indexes for performance
