@@ -1,7 +1,7 @@
 const Announcement = require('../models/announcement.model');
 const Member = require('../models/member.model');
 const User = require('../models/user.model');
-const { sendEmail } = require('../utils/mailer');
+const { sendEmail, sendBulkEmail } = require('../utils/mailer');
 const { addNotification } = require('../utils/notifications');
 
 exports.sendAnnouncement = async (req, res) => {
@@ -55,41 +55,32 @@ exports.sendAnnouncement = async (req, res) => {
       return true;
     });
 
-    let emailsSent = 0;
-    let emailsFailed = 0;
+    const bulkResult = await sendBulkEmail({
+      recipients: uniqueRecipients,
+      subject: `${priority === 'urgent' ? '🚨 URGENT: ' : '📢 '}${title} — IESA`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #0d7c3d; padding: 24px; border-radius: 8px 8px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 20px;">
+              ${priority === 'urgent' ? '🚨 ' : '📢 '}${title}
+            </h1>
+            <p style="color: rgba(255,255,255,0.7); margin: 4px 0 0; font-size: 13px;">
+              IESA — Industrial Engineering Students' Association
+            </p>
+          </div>
+          <div style="background: #f9fafb; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb;">
+            <p style="color: #374151; white-space: pre-wrap; line-height: 1.6;">${body}</p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+              This message was sent by the IESA Executive to ${audience === 'ALL' ? 'all members' : audience.toLowerCase().replace('_', ' ')}.
+            </p>
+          </div>
+        </div>
+      `
+    });
 
-    for (const recipient of uniqueRecipients) {
-      try {
-        await sendEmail({
-          to: recipient.email,
-          subject: `${priority === 'urgent' ? '🚨 URGENT: ' : '📢 '}${title} — IESA`,
-          html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="background: #0d7c3d; padding: 24px; border-radius: 8px 8px 0 0;">
-                  <h1 style="color: white; margin: 0; font-size: 20px;">
-                    ${priority === 'urgent' ? '🚨 ' : '📢 '}${title}
-                  </h1>
-                  <p style="color: rgba(255,255,255,0.7); margin: 4px 0 0; font-size: 13px;">
-                    IESA — Industrial Engineering Students' Association
-                  </p>
-                </div>
-                <div style="background: #f9fafb; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb;">
-                  <p style="color: #374151; white-space: pre-wrap; line-height: 1.6;">${body}</p>
-                  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
-                  <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-                    This message was sent by the IESA Executive to ${audience === 'ALL' ? 'all members' : audience.toLowerCase().replace('_', ' ')}.
-                  </p>
-                </div>
-              </div>
-            `
-        });
-        emailsSent++;
-      } catch (e) {
-        emailsFailed++;
-      }
-      // Wait 1200ms between each email to stay well under Resend's rate limit
-      await new Promise(resolve => setTimeout(resolve, 1200));
-    }
+    const emailsSent = bulkResult.sent;
+    const emailsFailed = bulkResult.failed;
 
     // Send in-portal notifications to exec users
     let notificationsSent = 0;
