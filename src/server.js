@@ -29,8 +29,9 @@ app.use(helmet({
 // ✅ FIXED: CORS Configuration
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://dept-exec-app.vercel.app',
+  'https://ipeexecs.page',
   'https://www.ipeexecs.page',
+  'https://dept-exec-app.vercel.app',
   process.env.FRONTEND_URL,
 ].filter(Boolean).map(o => o.trim());
 
