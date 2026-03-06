@@ -27,12 +27,22 @@ app.use(helmet({
 }));
 
 // ✅ FIXED: CORS Configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://dept-exec-app.vercel.app',
+  process.env.FRONTEND_URL,
+].filter(Boolean).map(o => o.trim());
+
 const corsOptions = {
-  origin: [
-    'http://localhost:3000',
-    'https://dept-exec-app.vercel.app',
-    process.env.FRONTEND_URL,
-  ].filter(Boolean),
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn(`CORS blocked origin: ${origin}`);
+    return callback(new Error(`CORS policy: origin ${origin} not allowed`));
+  },
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
