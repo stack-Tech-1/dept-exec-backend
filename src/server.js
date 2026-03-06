@@ -87,6 +87,7 @@ const reportRoutes = require("./routes/report.routes");
 const goalRoutes = require("./routes/goal.routes");
 const searchRoutes = require("./routes/search.routes");
 const memberRoutes = require("./routes/member.routes");
+const announcementRoutes = require("./routes/announcement.routes");
 
 // Import middleware
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
@@ -142,6 +143,7 @@ app.use("/api/goals", goalRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/members", memberRoutes);
+app.use("/api/announcements", announcementRoutes);
 
 const PORT = process.env.PORT || 5000;
 
