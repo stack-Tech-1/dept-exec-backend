@@ -408,6 +408,14 @@ exports.uploadAttachment = async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
+    console.log('🔍 Ownership check:', {
+      reqUserId: req.user.id,
+      reqUserRole: req.user.role,
+      taskAssignedTo: task.assignedTo,
+      taskAssignedToId: task.assignedTo?._id,
+      assignedToString: (task.assignedTo?._id || task.assignedTo)?.toString(),
+      match: (task.assignedTo?._id || task.assignedTo)?.toString() === req.user.id
+    });
     if (req.user.role === 'EXEC' && (task.assignedTo?._id || task.assignedTo).toString() !== req.user.id) {
       return res.status(403).json({ message: 'You can only upload to your own tasks' });
     }
@@ -465,6 +473,14 @@ exports.addComment = async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
+    console.log('🔍 Ownership check:', {
+      reqUserId: req.user.id,
+      reqUserRole: req.user.role,
+      taskAssignedTo: task.assignedTo,
+      taskAssignedToId: task.assignedTo?._id,
+      assignedToString: (task.assignedTo?._id || task.assignedTo)?.toString(),
+      match: (task.assignedTo?._id || task.assignedTo)?.toString() === req.user.id
+    });
     if (req.user.role === 'EXEC' && (task.assignedTo?._id || task.assignedTo).toString() !== req.user.id) {
       return res.status(403).json({ message: 'Not authorized' });
     }
