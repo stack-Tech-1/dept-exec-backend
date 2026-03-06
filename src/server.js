@@ -30,7 +30,7 @@ app.use(helmet({
 const allowedOrigins = [
   'http://localhost:3000',
   'https://dept-exec-app.vercel.app',
-  'www.ipeexecs.page',
+  'https://www.ipeexecs.page',
   process.env.FRONTEND_URL,
 ].filter(Boolean).map(o => o.trim());
 
