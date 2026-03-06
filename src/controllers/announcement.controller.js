@@ -58,16 +58,12 @@ exports.sendAnnouncement = async (req, res) => {
     let emailsSent = 0;
     let emailsFailed = 0;
 
-    // Send emails in batches of 10 to avoid overwhelming the mail server
-    const BATCH_SIZE = 10;
-    for (let i = 0; i < uniqueRecipients.length; i += BATCH_SIZE) {
-      const batch = uniqueRecipients.slice(i, i + BATCH_SIZE);
-      await Promise.allSettled(
-        batch.map(recipient =>
-          sendEmail({
-            to: recipient.email,
-            subject: `${priority === 'urgent' ? '🚨 URGENT: ' : '📢 '}${title} — IESA`,
-            html: `
+    for (const recipient of uniqueRecipients) {
+      try {
+        await sendEmail({
+          to: recipient.email,
+          subject: `${priority === 'urgent' ? '🚨 URGENT: ' : '📢 '}${title} — IESA`,
+          html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <div style="background: #0d7c3d; padding: 24px; border-radius: 8px 8px 0 0;">
                   <h1 style="color: white; margin: 0; font-size: 20px;">
@@ -86,15 +82,13 @@ exports.sendAnnouncement = async (req, res) => {
                 </div>
               </div>
             `
-          })
-          .then(() => emailsSent++)
-          .catch(() => emailsFailed++)
-        )
-      );
-      // Small delay between batches
-      if (i + BATCH_SIZE < uniqueRecipients.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        });
+        emailsSent++;
+      } catch (e) {
+        emailsFailed++;
       }
+      // Wait 600ms between each email to stay under Resend's 2/sec rate limit
+      await new Promise(resolve => setTimeout(resolve, 600));
     }
 
     // Send in-portal notifications to exec users
