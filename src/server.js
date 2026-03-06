@@ -132,7 +132,7 @@ app.use("/api/goals", goalRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/search", searchRoutes);
 
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB and start server
 connectDB().then(() => {
