@@ -1,54 +1,34 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require('resend');
 
-// Create transporter - Matching your working ERP configuration
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT) || 587,
-  secure: false, // Use false for 587, true for 465
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  // Increase timeout to give Render more time to negotiate with Google
-  connectionTimeout: 30000, 
-  greetingTimeout: 30000,
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-exports.sendEmail = async ({ to, subject, html, text }) => {
+const FROM_ADDRESS = process.env.FROM_EMAIL || 'IESA Portal <noreply@ipeexecs.page>';
+
+exports.sendEmail = async ({ to, subject, text, html }) => {
   try {
-    console.log(`📧 Attempting to send email to: ${to}`);
-    console.log(`📧 HTML length: ${html?.length || 0}`);    
-    console.log(`📧 Using email: ${process.env.EMAIL_USER}`);
-        
-    const mailOptions = {
-      from: `"Dept Exec System" <${process.env.EMAIL_USER}>`,
-      to: to,
-      subject: subject,
-      html: html,
-      text: text || "You have been invited to the Department Executive System.",
-    }
-    
-    console.log("📧 Mail options prepared");
-    
-    // Send email
-    const info = await transporter.sendMail(mailOptions);
-    
-    console.log(`✅ Email sent successfully to ${to}`);
-    console.log(`📧 Message ID: ${info.messageId}`);
-    return info;
-  } catch (error) {
-    console.error("❌ Email sending failed!");
-    console.error(`❌ Error: ${error.message}`);
-    console.error(`❌ Code: ${error.code}`);
-    console.error(`❌ Stack: ${error.stack}`);
-    
-    // More detailed error info
-    if (error.code === 'EAUTH') {
-      console.error("❌ Authentication failed. Check email/password.");
-    } else if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
-      console.error("❌ Connection failed. Check network/firewall.");
+    if (!process.env.RESEND_API_KEY) {
+      console.warn('⚠️ RESEND_API_KEY not set — skipping email');
+      return { success: false, error: 'No API key' };
     }
 
-    return { success: false, error: error.message };
+    const { data, error } = await resend.emails.send({
+      from: FROM_ADDRESS,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      html: html || `<p style="font-family:Arial,sans-serif;color:#374151;">${text}</p>`,
+      text: text || '',
+    });
+
+    if (error) {
+      console.error('❌ Resend error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`📧 Email sent to ${to} — ID: ${data?.id}`);
+    return { success: true, id: data?.id };
+
+  } catch (err) {
+    console.error('❌ Email failed:', err.message);
+    return { success: false, error: err.message };
   }
 };
