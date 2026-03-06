@@ -141,7 +141,7 @@ exports.updateTaskStatus = async (req, res) => {
   }
 
   // ✅ HARDENED: Ownership enforcement
-  if (req.user.role === "EXEC" && task.assignedTo.toString() !== req.user.id) {
+  if (req.user.role === "EXEC" && (task.assignedTo?._id || task.assignedTo).toString() !== req.user.id) {
     return res.status(403).json({
       message: "You can only update tasks assigned to you",
     });
@@ -408,7 +408,7 @@ exports.uploadAttachment = async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
-    if (req.user.role === 'EXEC' && task.assignedTo.toString() !== req.user.id) {
+    if (req.user.role === 'EXEC' && (task.assignedTo?._id || task.assignedTo).toString() !== req.user.id) {
       return res.status(403).json({ message: 'You can only upload to your own tasks' });
     }
 
@@ -465,7 +465,7 @@ exports.addComment = async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
-    if (req.user.role === 'EXEC' && task.assignedTo.toString() !== req.user.id) {
+    if (req.user.role === 'EXEC' && (task.assignedTo?._id || task.assignedTo).toString() !== req.user.id) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -512,7 +512,7 @@ exports.updateProgress = async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
-    if (req.user.role === 'EXEC' && task.assignedTo.toString() !== req.user.id) {
+    if (req.user.role === 'EXEC' && (task.assignedTo?._id || task.assignedTo).toString() !== req.user.id) {
       return res.status(403).json({ message: 'You can only update progress on your own tasks' });
     }
 
