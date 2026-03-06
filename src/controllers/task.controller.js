@@ -180,7 +180,7 @@ exports.updateTaskStatus = async (req, res) => {
     
     if (adminUser) {
       // Email notification
-      await sendEmail({
+      sendEmail({
         to: adminUser.email,
         subject: "Task Completed",
         text: `
@@ -194,10 +194,11 @@ Completed At: ${task.completedAt.toDateString()}
 
 – Dept Exec System
 `,
-      });
+      }).catch(err => console.error('Completion email failed:', err.message));
 
       // ✅ UPDATED: Use createTaskNotification instead of addNotification
-      await createTaskNotification(task, 'completed');
+      createTaskNotification(task, 'completed')
+        .catch(err => console.error('Completion notification failed:', err.message));
     }
   }
 
@@ -556,20 +557,20 @@ exports.verifyTask = async (req, res) => {
 
     await task.save();
 
-    await sendEmail({
+    sendEmail({
       to: task.assignedTo.email,
       subject: `✅ Task Verified: ${task.title}`,
       text: `Hello ${task.assignedTo.name},\n\nYour task "${task.title}" has been reviewed and verified by ${req.user.name} (${req.user.position}).\n\nWell done!\n\n– IESA Exec System`
-    });
+    }).catch(err => console.error('Verify notification email failed:', err.message));
 
-    await addNotification(
+    addNotification(
       task.assignedTo._id,
       `Your task "${task.title}" has been verified by ${req.user.name}`,
       'task',
       { taskId: task._id },
       `/dashboard/tasks/${task._id}`,
       'high'
-    );
+    ).catch(err => console.error('Verify notification failed:', err.message));
 
     res.json({ message: 'Task verified successfully', task });
   } catch (error) {
