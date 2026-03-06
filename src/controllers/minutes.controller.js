@@ -326,3 +326,44 @@ exports.approveMinutes = async (req, res) => {
     minutes: record,
   });
 };
+
+exports.extractTasks = async (req, res) => {
+  try {
+    const record = await Minutes.findById(req.params.id);
+
+    if (!record) {
+      return res.status(404).json({ message: "Minutes not found" });
+    }
+
+    const extractedTasks = await extractTasksFromMinutes(
+      record.minutesText,
+      record._id,
+      req.user.id
+    );
+
+    if (extractedTasks.length === 0) {
+      return res.json({ message: "No action items found in minutes", tasks: [] });
+    }
+
+    const createdTasks = await createTasksFromExtraction(extractedTasks);
+
+    for (const task of createdTasks) {
+      await addNotification(
+        task.assignedTo._id,
+        `New task extracted from minutes: ${task.title}`,
+        'task',
+        { taskId: task._id, source: 'minutes', minutesId: record._id },
+        `/dashboard/tasks/${task._id}`,
+        'medium'
+      );
+    }
+
+    res.json({
+      message: `Extracted ${createdTasks.length} task(s) from minutes`,
+      tasks: createdTasks,
+    });
+  } catch (error) {
+    console.error("Extract tasks error:", error);
+    res.status(500).json({ message: "Failed to extract tasks from minutes" });
+  }
+};

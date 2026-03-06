@@ -3,6 +3,7 @@ const Task = require("../models/task.model");
 const Meeting = require("../models/meeting.model");
 const Goal = require("../models/goal.model");
 const User = require("../models/user.model");
+const Minutes = require("../models/minutes.model");
 
 exports.getTaskReport = async (req, res) => {
   try {
@@ -820,14 +821,16 @@ exports.getDashboardSummary = async (req, res) => {
       activeUsers,
       goalsByStatus,
       upcomingMeetingsCount,
-      overdueTasks
+      overdueTasks,
+      pendingMinutesCount
     ] = await Promise.all([
       Task.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
       User.countDocuments(),
       User.countDocuments({ isActive: true }),
       Goal.aggregate([{ $match: { isArchived: false } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
       Meeting.countDocuments({ date: { $gte: now } }),
-      Task.countDocuments({ status: 'OVERDUE' })
+      Task.countDocuments({ status: 'OVERDUE' }),
+      Minutes.countDocuments({ approved: false })
     ]);
 
     const taskStats = tasksByStatus.reduce((acc, cur) => {
@@ -860,6 +863,7 @@ exports.getDashboardSummary = async (req, res) => {
       },
       upcomingMeetings: upcomingMeetingsCount,
       overdueTasks,
+      pendingMinutes: pendingMinutesCount,
     });
   } catch (error) {
     console.error('Get dashboard summary error:', error);

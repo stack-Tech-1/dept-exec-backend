@@ -40,9 +40,15 @@ router.post("/:id/approve",
 );
 
 // Delete minutes (admin only, only if not approved)
-router.delete("/:id", 
-  authorize(["ADMIN"]), 
+router.delete("/:id",
+  authorize(["ADMIN"]),
   minutesController.deleteMinutes
+);
+
+// Extract action items as tasks from minutes (admin only)
+router.post("/:id/extract-tasks",
+  authorize(["ADMIN"]),
+  minutesController.extractTasks
 );
 
 module.exports = router;
