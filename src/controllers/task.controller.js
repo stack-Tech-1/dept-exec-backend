@@ -421,9 +421,9 @@ exports.uploadAttachment = async (req, res) => {
     }
 
     task.attachments.push({
-      filename: req.file.filename,
+      filename: req.file.filename || req.file.public_id,
       originalName: req.file.originalname,
-      url: `/uploads/tasks/${req.file.filename}`,
+      url: req.file.path, // Cloudinary returns the full URL in req.file.path
       mimetype: req.file.mimetype,
       size: req.file.size,
       uploadedBy: req.user.id,
