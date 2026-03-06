@@ -87,8 +87,8 @@ exports.sendAnnouncement = async (req, res) => {
       } catch (e) {
         emailsFailed++;
       }
-      // Wait 600ms between each email to stay under Resend's 2/sec rate limit
-      await new Promise(resolve => setTimeout(resolve, 600));
+      // Wait 1200ms between each email to stay well under Resend's rate limit
+      await new Promise(resolve => setTimeout(resolve, 1200));
     }
 
     // Send in-portal notifications to exec users
