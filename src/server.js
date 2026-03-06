@@ -29,11 +29,10 @@ app.use(helmet({
 // ✅ FIXED: CORS Configuration
 const corsOptions = {
   origin: [
-    'http://localhost:3000', // Local development
-    'https://dept-exec-app.onrender.com', // Your frontend URL
-    'https://dept-exec-app.vercel.app', // Another frontend URL
-    process.env.FRONTEND_URL // From environment variable
-  ].filter(Boolean), // Remove any undefined values
+    'http://localhost:3000',
+    'https://dept-exec-app.vercel.app',
+    process.env.FRONTEND_URL,
+  ].filter(Boolean),
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -86,7 +85,7 @@ const connectDB = require("./config/db");
 const { startOverdueChecker } = require("./utils/overdueChecker");
 
 // ✅ SECURITY: Create uploads directory if it doesn't exist
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+if (process.env.NODE_ENV !== 'production') {
   const uploadsDir = path.join(__dirname, "uploads", "minutes");
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
