@@ -92,6 +92,7 @@ const memberRoutes = require("./routes/member.routes");
 const announcementRoutes = require("./routes/announcement.routes");
 const eventRoutes = require("./routes/event.routes");
 const attendanceRoutes = require("./routes/attendance.routes");
+const electionRoutes = require("./routes/election.routes");
 
 // Import middleware
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
@@ -150,6 +151,7 @@ app.use("/api/members", memberRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/elections", electionRoutes);
 
 const PORT = process.env.PORT || 5000;
 
