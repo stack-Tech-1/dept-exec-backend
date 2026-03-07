@@ -91,6 +91,7 @@ const searchRoutes = require("./routes/search.routes");
 const memberRoutes = require("./routes/member.routes");
 const announcementRoutes = require("./routes/announcement.routes");
 const eventRoutes = require("./routes/event.routes");
+const attendanceRoutes = require("./routes/attendance.routes");
 
 // Import middleware
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
@@ -148,6 +149,7 @@ app.use("/api/search", searchRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/events", eventRoutes);
+app.use("/api/attendance", attendanceRoutes);
 
 const PORT = process.env.PORT || 5000;
 
@@ -164,7 +166,8 @@ connectDB().then(() => {
     console.log(`📁 Uploads directory: ${path.join(__dirname, "uploads")}`);
 
     // Initialize Socket.io
-    initializeSocket(server, corsOptions);
+    const io = initializeSocket(server, corsOptions);
+    app.set('io', io);
     console.log('🔌 Socket.io initialized');
 
     // Start background services
