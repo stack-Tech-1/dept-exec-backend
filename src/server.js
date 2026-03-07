@@ -96,6 +96,7 @@ const electionRoutes = require("./routes/election.routes");
 const welfareRoutes = require("./routes/welfare.routes");
 const handoverRoutes = require("./routes/handover.routes");
 const calendarRoutes = require("./routes/calendar.routes");
+const assistantRoutes = require("./routes/assistant.routes");
 
 // Import middleware
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
@@ -158,6 +159,7 @@ app.use("/api/elections", electionRoutes);
 app.use("/api/welfare", welfareRoutes);
 app.use("/api/handover", handoverRoutes);
 app.use("/api/calendar", calendarRoutes);
+app.use("/api/assistant", assistantRoutes);
 
 const PORT = process.env.PORT || 5000;
 

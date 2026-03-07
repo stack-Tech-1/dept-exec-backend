@@ -23,6 +23,7 @@
   "license": "MIT",
   "description": "Department Executive Management System",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.5",
