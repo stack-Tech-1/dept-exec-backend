@@ -61,9 +61,11 @@ const EXECUTIVE_POSITIONS = [
     phone: {
       type: String,
       trim: true
-    }
-  }, { 
-    timestamps: true 
+    },
+    resetPasswordToken: { type: String, default: null },
+    resetPasswordExpiry: { type: Date, default: null },
+  }, {
+    timestamps: true
   });
 
   userSchema.index({

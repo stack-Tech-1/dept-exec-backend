@@ -22,4 +22,9 @@ router.get("/validate-invite/:token", validateInviteToken);
 // PUBLIC: Login
 router.post("/login", login);
 
+const passwordController = require('../controllers/auth.password.controller');
+router.post('/forgot-password', passwordController.forgotPassword);
+router.post('/reset-password', passwordController.resetPassword);
+router.get('/verify-reset-token/:token', passwordController.verifyResetToken);
+
 module.exports = router;
