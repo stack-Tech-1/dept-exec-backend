@@ -100,8 +100,11 @@ exports.updateStatus = async (req, res) => {
     }
     const election = await Election.findById(req.params.id);
     if (!election) return res.status(404).json({ message: 'Election not found' });
-    if (status === 'OPEN' && election.candidates.length < 2) {
-      return res.status(400).json({ message: 'Need at least 2 candidates to open voting' });
+    if (election.status === 'CLOSED') {
+      return res.status(400).json({ message: 'This election is already closed and cannot be changed.' });
+    }
+    if (status === 'PENDING' && election.status === 'OPEN') {
+      return res.status(400).json({ message: 'An open election cannot be moved back to pending.' });
     }
     election.status = status;
     if (status === 'OPEN') election.openedAt = new Date();

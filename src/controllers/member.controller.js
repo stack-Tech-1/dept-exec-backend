@@ -1,4 +1,5 @@
 const Member = require('../models/member.model');
+const MemberRegistrationLink = require('../models/memberRegistrationLink.model');
 
 // GET all members with filtering + pagination
 exports.getMembers = async (req, res) => {
@@ -126,5 +127,107 @@ exports.getMemberStats = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+// POST create registration link (admin only)
+exports.createLink = async (req, res) => {
+  try {
+    const { label, expiresAt } = req.body;
+    if (!expiresAt) return res.status(400).json({ message: 'expiresAt is required.' });
+    const link = await MemberRegistrationLink.create({ label, expiresAt, createdBy: req.user.id });
+    const populated = await MemberRegistrationLink.findById(link._id).populate('createdBy', 'name');
+    res.status(201).json(populated);
+  } catch (err) {
+    console.error('Create link error:', err);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// GET list all registration links (admin only)
+exports.listLinks = async (req, res) => {
+  try {
+    const links = await MemberRegistrationLink.find()
+      .populate('createdBy', 'name')
+      .sort({ createdAt: -1 });
+    res.json(links);
+  } catch (err) {
+    console.error('List links error:', err);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// DELETE deactivate a registration link (admin only)
+exports.deactivateLink = async (req, res) => {
+  try {
+    const link = await MemberRegistrationLink.findById(req.params.id);
+    if (!link) return res.status(404).json({ message: 'Registration link not found.' });
+    link.isActive = false;
+    await link.save();
+    res.json({ message: 'Registration link deactivated.', isActive: false });
+  } catch (err) {
+    console.error('Deactivate link error:', err);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// GET validate a registration link (PUBLIC)
+exports.validateLink = async (req, res) => {
+  try {
+    const link = await MemberRegistrationLink.findOne({ token: req.params.token });
+    if (!link || !link.isActive) {
+      return res.status(400).json({ message: 'This registration link is invalid or no longer active.' });
+    }
+    if (link.expiresAt < new Date()) {
+      return res.status(400).json({ message: 'This registration link has expired.' });
+    }
+    res.json({ label: link.label, expiresAt: link.expiresAt });
+  } catch (err) {
+    console.error('Validate link error:', err);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// POST register a member via link (PUBLIC)
+exports.registerMember = async (req, res) => {
+  try {
+    const link = await MemberRegistrationLink.findOne({ token: req.params.token });
+    if (!link || !link.isActive) {
+      return res.status(400).json({ message: 'This registration link is invalid or no longer active.' });
+    }
+    if (link.expiresAt < new Date()) {
+      return res.status(400).json({ message: 'This registration link has expired.' });
+    }
+
+    const { fullName, email, matricNumber, level, phone, gender } = req.body;
+    if (!fullName?.trim() || !email?.trim() || !matricNumber?.trim() || !level || !phone?.trim() || !gender) {
+      return res.status(400).json({ message: 'All fields are required: fullName, email, matricNumber, level, phone, gender.' });
+    }
+
+    const existingEmail = await Member.findOne({ email: email.toLowerCase().trim() });
+    if (existingEmail) return res.status(400).json({ message: 'Email already registered.' });
+
+    const existingMatric = await Member.findOne({ matricNumber: matricNumber.trim().toUpperCase() });
+    if (existingMatric) return res.status(400).json({ message: 'Matric number already registered.' });
+
+    const member = await Member.create({
+      name: fullName.trim(),
+      email: email.toLowerCase().trim(),
+      matricNumber: matricNumber.trim().toUpperCase(),
+      level,
+      phone: phone.trim(),
+      gender,
+      registrationToken: link._id,
+      registeredAt: new Date()
+    });
+
+    res.status(201).json({ message: 'Registration successful.', memberId: member._id });
+  } catch (err) {
+    console.error('Register member error:', err);
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyValue || {})[0];
+      return res.status(400).json({ message: `${field === 'email' ? 'Email' : 'Matric number'} already registered.` });
+    }
+    res.status(500).json({ message: 'Server error. Please try again.' });
   }
 };
