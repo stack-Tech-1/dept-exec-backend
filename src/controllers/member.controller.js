@@ -133,9 +133,11 @@ exports.getMemberStats = async (req, res) => {
 // POST create registration link (admin only)
 exports.createLink = async (req, res) => {
   try {
-    const { label, expiresAt } = req.body;
+    let { label, expiresAt } = req.body;
     if (!expiresAt) return res.status(400).json({ message: 'expiresAt is required.' });
-    const link = await MemberRegistrationLink.create({ label, expiresAt, createdBy: req.user.id });
+    const expiry = new Date(expiresAt);
+    expiry.setHours(23, 59, 59, 999);
+    const link = await MemberRegistrationLink.create({ label, expiresAt: expiry, createdBy: req.user.id });
     const populated = await MemberRegistrationLink.findById(link._id).populate('createdBy', 'name');
     res.status(201).json(populated);
   } catch (err) {
@@ -178,7 +180,8 @@ exports.validateLink = async (req, res) => {
     if (!link || !link.isActive) {
       return res.status(400).json({ message: 'This registration link is invalid or no longer active.' });
     }
-    if (link.expiresAt < new Date()) {
+    const endOfDay = new Date(link.expiresAt); endOfDay.setHours(23, 59, 59, 999);
+    if (endOfDay < new Date()) {
       return res.status(400).json({ message: 'This registration link has expired.' });
     }
     res.json({ label: link.label, expiresAt: link.expiresAt });
@@ -195,7 +198,8 @@ exports.registerMember = async (req, res) => {
     if (!link || !link.isActive) {
       return res.status(400).json({ message: 'This registration link is invalid or no longer active.' });
     }
-    if (link.expiresAt < new Date()) {
+    const endOfDay = new Date(link.expiresAt); endOfDay.setHours(23, 59, 59, 999);
+    if (endOfDay < new Date()) {
       return res.status(400).json({ message: 'This registration link has expired.' });
     }
 
