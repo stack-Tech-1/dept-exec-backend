@@ -130,6 +130,13 @@ exports.getMemberStats = async (req, res) => {
   }
 };
 
+function computeLinkStatus(link) {
+  if (!link.isActive) return 'inactive';
+  const endOfDay = new Date(link.expiresAt);
+  endOfDay.setHours(23, 59, 59, 999);
+  return endOfDay < new Date() ? 'expired' : 'active';
+}
+
 // POST create registration link (admin only)
 exports.createLink = async (req, res) => {
   try {
@@ -139,7 +146,7 @@ exports.createLink = async (req, res) => {
     expiry.setHours(23, 59, 59, 999);
     const link = await MemberRegistrationLink.create({ label, expiresAt: expiry, createdBy: req.user.id });
     const populated = await MemberRegistrationLink.findById(link._id).populate('createdBy', 'name');
-    res.status(201).json(populated);
+    res.status(201).json({ ...populated.toObject(), status: computeLinkStatus(populated) });
   } catch (err) {
     console.error('Create link error:', err);
     res.status(500).json({ message: 'Server error. Please try again.' });
@@ -152,7 +159,7 @@ exports.listLinks = async (req, res) => {
     const links = await MemberRegistrationLink.find()
       .populate('createdBy', 'name')
       .sort({ createdAt: -1 });
-    res.json(links);
+    res.json(links.map(l => ({ ...l.toObject(), status: computeLinkStatus(l) })));
   } catch (err) {
     console.error('List links error:', err);
     res.status(500).json({ message: 'Server error. Please try again.' });
