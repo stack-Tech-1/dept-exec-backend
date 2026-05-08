@@ -27,6 +27,9 @@ const eventSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   coverImage: { type: String }, // Cloudinary URL
   tags: [{ type: String, trim: true }],
+  isPaidEvent: { type: Boolean, default: false },
+  ticketPrice: { type: Number },
+  ticketItems: [{ type: String, trim: true }],
 }, { timestamps: true });
 
 eventSchema.index({ date: 1 });
