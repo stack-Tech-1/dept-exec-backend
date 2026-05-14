@@ -218,3 +218,18 @@ exports.checkVoted = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
+
+// DELETE election (admin only — PENDING or CLOSED only)
+exports.deleteElection = async (req, res) => {
+  try {
+    const election = await Election.findById(req.params.id);
+    if (!election) return res.status(404).json({ message: 'Election not found' });
+    if (election.status === 'OPEN') {
+      return res.status(400).json({ message: 'Cannot delete an election that is currently open' });
+    }
+    await election.deleteOne();
+    res.json({ message: 'Election deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
