@@ -99,6 +99,7 @@ const handoverRoutes = require("./routes/handover.routes");
 const calendarRoutes = require("./routes/calendar.routes");
 const assistantRoutes = require("./routes/assistant.routes");
 const eventTicketRoutes = require("./routes/eventTicket.routes");
+const eventGuestRoutes = require("./routes/eventGuest.routes");
 
 // Import middleware
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
@@ -155,6 +156,9 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/announcements", announcementRoutes);
+// Mount event-guest routes before event routes so public guest endpoints
+// are reachable without auth (event router applies authenticate globally)
+app.use("/api", eventGuestRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/elections", electionRoutes);

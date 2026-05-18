@@ -30,6 +30,7 @@ const eventSchema = new mongoose.Schema({
   isPaidEvent: { type: Boolean, default: false },
   ticketPrice: { type: Number },
   ticketItems: [{ type: String, trim: true }],
+  guestRegistrationEnabled: { type: Boolean, default: false },
 }, { timestamps: true });
 
 eventSchema.index({ date: 1 });
