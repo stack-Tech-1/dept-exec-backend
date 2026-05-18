@@ -6,7 +6,7 @@ const { sendEmail } = require('../utils/mailer');
 exports.getEventPublicInfo = async (req, res) => {
   try {
     const event = await Event.findById(req.params.eventId)
-      .select('title date time venue isPaidEvent guestRegistrationEnabled status');
+      .select('title date time venue isPaidEvent guestRegistrationEnabled status registrationBrandName');
     if (!event) return res.status(404).json({ message: 'Event not found' });
     res.json(event);
   } catch (err) {
@@ -29,7 +29,7 @@ exports.registerGuest = async (req, res) => {
       return res.status(400).json({ message: 'Department is required for students from other departments' });
     }
 
-    const event = await Event.findById(eventId).select('title date time venue isPaidEvent ticketItems guestRegistrationEnabled');
+    const event = await Event.findById(eventId).select('title date time venue isPaidEvent ticketItems guestRegistrationEnabled registrationBrandName');
     if (!event) return res.status(404).json({ message: 'Event not found' });
     if (!event.guestRegistrationEnabled) {
       return res.status(403).json({ message: 'Guest registration is not open for this event' });
@@ -71,6 +71,7 @@ exports.registerGuest = async (req, res) => {
         eventTime: event.time,
         isPaidEvent: event.isPaidEvent,
         ticketUrl,
+        brandName: event.registrationBrandName,
       }),
     });
 
@@ -104,7 +105,7 @@ exports.getGuestsForEvent = async (req, res) => {
 exports.getGuestByToken = async (req, res) => {
   try {
     const guest = await EventGuest.findOne({ token: req.params.token })
-      .populate('event', 'title date time venue coverImage isPaidEvent');
+      .populate('event', 'title date time venue coverImage isPaidEvent registrationBrandName');
     if (!guest) return res.status(404).json({ message: 'Ticket not found. This link may be invalid.' });
     res.json(guest);
   } catch (err) {
@@ -143,6 +144,7 @@ exports.confirmGuestPayment = async (req, res) => {
         eventTime: event.time,
         items: guest.items.map(i => i.name),
         ticketUrl,
+        brandName: event.registrationBrandName,
       }),
     });
 
@@ -177,6 +179,7 @@ exports.resendGuestEmail = async (req, res) => {
           eventTime: event.time,
           items: guest.items.map(i => i.name),
           ticketUrl,
+          brandName: event.registrationBrandName,
         }),
       });
     } else {
@@ -191,6 +194,7 @@ exports.resendGuestEmail = async (req, res) => {
           eventTime: event.time,
           isPaidEvent: event.isPaidEvent,
           ticketUrl,
+          brandName: event.registrationBrandName,
         }),
       });
     }
@@ -303,7 +307,12 @@ exports.exportGuestsCsv = async (req, res) => {
 
 // ─── Email templates ──────────────────────────────────────────────────────────
 
-function buildRegistrationEmail({ guestName, eventTitle, eventDate, eventVenue, eventTime, isPaidEvent, ticketUrl }) {
+function buildRegistrationEmail({ guestName, eventTitle, eventDate, eventVenue, eventTime, isPaidEvent, ticketUrl, brandName }) {
+  const displayBrand = brandName || 'IESA';
+  const orgLine = brandName
+    ? `${brandName} · University of Ibadan`
+    : "IESA — Industrial Engineering Students' Association · University of Ibadan";
+
   return `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0d1117;color:#e6edf3;padding:40px;border-radius:12px;">
   <div style="text-align:center;margin-bottom:32px;">
@@ -335,13 +344,15 @@ function buildRegistrationEmail({ guestName, eventTitle, eventDate, eventVenue, 
   </div>` : ''}
 
   <hr style="border:none;border-top:1px solid #30363d;margin:24px 0;">
-  <p style="color:#8b949e;font-size:12px;text-align:center;">
-    IESA — Industrial Engineering Students' Association · University of Ibadan
-  </p>
+  <p style="color:#8b949e;font-size:12px;text-align:center;">${orgLine}</p>
 </div>`;
 }
 
-function buildTicketConfirmedEmail({ guestName, eventTitle, eventDate, eventVenue, eventTime, items, ticketUrl }) {
+function buildTicketConfirmedEmail({ guestName, eventTitle, eventDate, eventVenue, eventTime, items, ticketUrl, brandName }) {
+  const orgLine = brandName
+    ? `${brandName} · University of Ibadan`
+    : "IESA — Industrial Engineering Students' Association · University of Ibadan";
+
   const itemRows = items.map(item =>
     `<p style="margin:6px 0;color:#3fb950;font-size:15px;">✅ ${item}</p>`
   ).join('');
@@ -355,7 +366,7 @@ function buildTicketConfirmedEmail({ guestName, eventTitle, eventDate, eventVenu
   </div>
 
   <p style="color:#e6edf3;font-size:16px;">Hi <strong>${guestName}</strong>,</p>
-  <p style="color:#8b949e;line-height:1.6;">Your payment has been confirmed. Here are your event details and what's included in your ticket.</p>
+  <p style="color:#8b949e;line-height:1.6;">Your payment has been confirmed by the social director. Here are your event details and what's included in your ticket.</p>
 
   <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;margin:24px 0;">
     <p style="margin:0 0 12px;color:#8b949e;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Event Details</p>
@@ -383,8 +394,6 @@ function buildTicketConfirmedEmail({ guestName, eventTitle, eventDate, eventVenu
   </p>
 
   <hr style="border:none;border-top:1px solid #30363d;margin:24px 0;">
-  <p style="color:#8b949e;font-size:12px;text-align:center;">
-    IESA — Industrial Engineering Students' Association · University of Ibadan
-  </p>
+  <p style="color:#8b949e;font-size:12px;text-align:center;">${orgLine}</p>
 </div>`;
 }

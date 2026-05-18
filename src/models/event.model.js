@@ -31,6 +31,7 @@ const eventSchema = new mongoose.Schema({
   ticketPrice: { type: Number },
   ticketItems: [{ type: String, trim: true }],
   guestRegistrationEnabled: { type: Boolean, default: false },
+  registrationBrandName: { type: String, trim: true },
 }, { timestamps: true });
 
 eventSchema.index({ date: 1 });
