@@ -1,5 +1,6 @@
 const VotingSession = require('../models/votingSession.model');
 const Election = require('../models/election.model');
+const Member = require('../models/member.model');
 
 // POST /api/voting-sessions — admin only
 exports.createSession = async (req, res) => {
@@ -156,6 +157,12 @@ exports.submitVotes = async (req, res) => {
     }
 
     const normalizedId = identifier.trim().toUpperCase();
+
+    const member = await Member.findOne({ matricNumber: normalizedId, isActive: true });
+    if (!member) {
+      return res.status(403).json({ message: 'Matric number not found. Only registered department members can vote.' });
+    }
+
     const alreadyVoted = session.voterLog.some(v => v.identifier === normalizedId);
     if (alreadyVoted) {
       return res.status(400).json({ message: 'You have already voted in this session.' });
