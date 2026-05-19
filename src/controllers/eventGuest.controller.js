@@ -6,7 +6,7 @@ const { sendEmail } = require('../utils/mailer');
 exports.getEventPublicInfo = async (req, res) => {
   try {
     const event = await Event.findById(req.params.eventId)
-      .select('title date time venue isPaidEvent guestRegistrationEnabled status registrationBrandName');
+      .select('title date time venue isPaidEvent guestRegistrationEnabled status registrationBrandName coverImage');
     if (!event) return res.status(404).json({ message: 'Event not found' });
     res.json(event);
   } catch (err) {
@@ -29,7 +29,7 @@ exports.registerGuest = async (req, res) => {
       return res.status(400).json({ message: 'Department is required for students from other departments' });
     }
 
-    const event = await Event.findById(eventId).select('title date time venue isPaidEvent ticketItems guestRegistrationEnabled registrationBrandName');
+    const event = await Event.findById(eventId).select('title date time venue isPaidEvent ticketItems guestRegistrationEnabled registrationBrandName coverImage');
     if (!event) return res.status(404).json({ message: 'Event not found' });
     if (!event.guestRegistrationEnabled) {
       return res.status(403).json({ message: 'Guest registration is not open for this event' });

@@ -74,6 +74,12 @@ exports.createEvent = async (req, res) => {
   }
 };
 
+// POST upload event cover image (admin only)
+exports.uploadCoverImage = async (req, res) => {
+  if (!req.file?.path) return res.status(400).json({ message: 'No image uploaded.' });
+  res.json({ url: req.file.path });
+};
+
 // PUT update event (admin only)
 exports.updateEvent = async (req, res) => {
   try {
