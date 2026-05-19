@@ -1,5 +1,6 @@
 const Election = require('../models/election.model');
 const Member = require('../models/member.model');
+const User = require('../models/user.model');
 
 // GET all elections
 exports.getElections = async (req, res) => {
@@ -150,6 +151,12 @@ exports.castVote = async (req, res) => {
     });
     if (!member) {
       return res.status(404).json({ message: 'Matric number not found. Only registered IESA members can vote.' });
+    }
+
+    // Block executives from voting
+    const isExec = await User.findOne({ matricNumber: matricNumber.trim().toUpperCase() });
+    if (isExec) {
+      return res.status(403).json({ message: 'Executives are not eligible to vote.' });
     }
 
     // Check already voted

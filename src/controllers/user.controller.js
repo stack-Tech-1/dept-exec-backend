@@ -110,7 +110,7 @@ exports.updateCurrentUser = async (req, res) => {
 // Update user (Admin or user themselves)
 exports.updateUser = async (req, res) => {
   try {
-    const { name, email, role, department, position } = req.body;
+    const { name, email, role, department, position, matricNumber } = req.body;
     const userId = req.params.id;
 
     // Check if user exists
@@ -144,6 +144,7 @@ exports.updateUser = async (req, res) => {
     if (role) updates.role = role;
     if (department) updates.department = department;
     if (position) updates.position = position;
+    if (matricNumber !== undefined) updates.matricNumber = matricNumber.trim().toUpperCase() || undefined;
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,

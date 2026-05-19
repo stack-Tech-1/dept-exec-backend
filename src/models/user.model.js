@@ -62,6 +62,7 @@ const EXECUTIVE_POSITIONS = [
       type: String,
       trim: true
     },
+    matricNumber: { type: String, trim: true, uppercase: true, sparse: true },
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpiry: { type: Date, default: null },
   }, {

@@ -1,6 +1,7 @@
 const VotingSession = require('../models/votingSession.model');
 const Election = require('../models/election.model');
 const Member = require('../models/member.model');
+const User = require('../models/user.model');
 
 // POST /api/voting-sessions — admin only
 exports.createSession = async (req, res) => {
@@ -161,6 +162,11 @@ exports.submitVotes = async (req, res) => {
     const member = await Member.findOne({ matricNumber: normalizedId, isActive: true });
     if (!member) {
       return res.status(403).json({ message: 'Matric number not found. Only registered department members can vote.' });
+    }
+
+    const isExec = await User.findOne({ matricNumber: normalizedId });
+    if (isExec) {
+      return res.status(403).json({ message: 'Executives are not eligible to vote.' });
     }
 
     const alreadyVoted = session.voterLog.some(v => v.identifier === normalizedId);
