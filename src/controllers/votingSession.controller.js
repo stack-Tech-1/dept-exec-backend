@@ -88,6 +88,55 @@ exports.deactivateSession = async (req, res) => {
   }
 };
 
+// PATCH /api/voting-sessions/:token/close-all — admin only
+exports.closeSessionElections = async (req, res) => {
+  try {
+    const session = await VotingSession.findOne({ token: req.params.token });
+    if (!session) return res.status(404).json({ message: 'Voting session not found.' });
+
+    const now = new Date();
+    await Election.updateMany(
+      { _id: { $in: session.elections }, status: 'OPEN' },
+      { $set: { status: 'CLOSED', closedAt: now } }
+    );
+
+    session.isActive = false;
+    await session.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      for (const elId of session.elections) {
+        io.emit('election-status-update', { electionId: elId.toString(), status: 'CLOSED' });
+      }
+    }
+
+    res.json({ message: 'All elections in this session have been closed.' });
+  } catch (err) {
+    console.error('Close session elections error:', err);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// DELETE /api/voting-sessions/:token — admin only
+exports.deleteSession = async (req, res) => {
+  try {
+    const session = await VotingSession.findOne({ token: req.params.token })
+      .populate('elections', 'status');
+    if (!session) return res.status(404).json({ message: 'Voting session not found.' });
+
+    const hasOpenElections = session.elections.some(e => e.status === 'OPEN');
+    if (hasOpenElections) {
+      return res.status(400).json({ message: 'Cannot delete a session that has open elections. Close all elections first.' });
+    }
+
+    await VotingSession.deleteOne({ token: req.params.token });
+    res.json({ message: 'Voting session deleted.' });
+  } catch (err) {
+    console.error('Delete session error:', err);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
 // POST /api/voting-sessions/:token/vote — public
 exports.submitVotes = async (req, res) => {
   try {
@@ -95,8 +144,8 @@ exports.submitVotes = async (req, res) => {
     if (!identifier?.trim()) {
       return res.status(400).json({ message: 'Identifier (matric number) is required.' });
     }
-    if (!Array.isArray(votes) || votes.length === 0) {
-      return res.status(400).json({ message: 'At least one vote is required.' });
+    if (!Array.isArray(votes)) {
+      return res.status(400).json({ message: 'votes must be an array.' });
     }
 
     const session = await VotingSession.findOne({ token: req.params.token });
@@ -113,7 +162,7 @@ exports.submitVotes = async (req, res) => {
     }
 
     const sessionElectionIds = session.elections.map(id => id.toString());
-    const electionsVoted = [];
+    const votedElectionIds = new Set();
 
     for (const vote of votes) {
       const { electionId, candidateId } = vote;
@@ -137,10 +186,17 @@ exports.submitVotes = async (req, res) => {
       election.totalVotes += 1;
       await election.save();
 
-      electionsVoted.push(electionId);
+      votedElectionIds.add(electionId.toString());
     }
 
-    session.voterLog.push({ identifier: normalizedId, electionsVoted });
+    // Increment undecidedCount for elections in session that were skipped
+    for (const elId of sessionElectionIds) {
+      if (!votedElectionIds.has(elId)) {
+        await Election.findByIdAndUpdate(elId, { $inc: { undecidedCount: 1 } });
+      }
+    }
+
+    session.voterLog.push({ identifier: normalizedId, electionsVoted: sessionElectionIds });
     await session.save();
 
     res.json({ message: 'Votes submitted successfully.' });

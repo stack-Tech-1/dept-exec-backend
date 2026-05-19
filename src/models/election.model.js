@@ -28,7 +28,8 @@ const electionSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   openedAt: { type: Date },
   closedAt: { type: Date },
-  totalVotes: { type: Number, default: 0 }
+  totalVotes: { type: Number, default: 0 },
+  undecidedCount: { type: Number, default: 0 }
 }, { timestamps: true });
 
 electionSchema.index({ status: 1 });

@@ -11,6 +11,8 @@ router.post('/:token/vote',  ctrl.submitVotes);
 router.use(authenticate);
 router.get('/',              ctrl.listSessions);
 router.post('/',             adminOnly, ctrl.createSession);
-router.patch('/:token/deactivate', adminOnly, ctrl.deactivateSession);
+router.patch('/:token/deactivate',  adminOnly, ctrl.deactivateSession);
+router.patch('/:token/close-all',   adminOnly, ctrl.closeSessionElections);
+router.delete('/:token',            adminOnly, ctrl.deleteSession);
 
 module.exports = router;
