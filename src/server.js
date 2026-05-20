@@ -196,6 +196,7 @@ connectDB().then(() => {
   // 404 and error handlers — registered after all routes
   app.use(notFoundHandler);
   app.use(errorHandler);
+  
 
   // Graceful shutdown
   const shutdown = (signal) => {
