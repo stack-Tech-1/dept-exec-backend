@@ -8,7 +8,10 @@ exports.getMembers = async (req, res) => {
     const filter = { isActive: true };
     if (level) filter.level = level;
     if (gender) filter.gender = gender;
-    if (search) filter.$text = { $search: search };
+    if (search) {
+      const re = new RegExp(search.trim(), 'i');
+      filter.$or = [{ name: re }, { matricNumber: re }];
+    }
     if (duesPaid !== undefined && session) {
       filter['dues'] = { $elemMatch: { session, paid: duesPaid === 'true' } };
     }
