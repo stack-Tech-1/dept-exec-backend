@@ -202,13 +202,12 @@ exports.deleteUser = async (req, res) => {
       }
     }
 
-    user.isActive = false;
-    await user.save();
+    await User.findByIdAndDelete(userId);
 
-    res.json({ message: 'User deactivated successfully' });
+    res.json({ message: 'User deleted successfully' });
   } catch (error) {
-    console.error('Error deactivating user:', error);
-    res.status(500).json({ message: 'Server error deactivating user' });
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Server error deleting user' });
   }
 };
 

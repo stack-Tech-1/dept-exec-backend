@@ -166,16 +166,14 @@ exports.listLinks = async (req, res) => {
   }
 };
 
-// DELETE deactivate a registration link (admin only)
+// DELETE a registration link (admin only)
 exports.deactivateLink = async (req, res) => {
   try {
-    const link = await MemberRegistrationLink.findById(req.params.id);
+    const link = await MemberRegistrationLink.findByIdAndDelete(req.params.id);
     if (!link) return res.status(404).json({ message: 'Registration link not found.' });
-    link.isActive = false;
-    await link.save();
-    res.json({ message: 'Registration link deactivated.', isActive: false });
+    res.json({ message: 'Registration link deleted.' });
   } catch (err) {
-    console.error('Deactivate link error:', err);
+    console.error('Delete link error:', err);
     res.status(500).json({ message: 'Server error. Please try again.' });
   }
 };
