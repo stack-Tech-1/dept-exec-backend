@@ -18,5 +18,9 @@ router.post('/:id/candidates', authorize(['ADMIN']), uploadTaskFile.single('phot
 router.delete('/:id/candidates/:candidateId', authorize(['ADMIN']), electionController.removeCandidate);
 router.patch('/:id/status', authorize(['ADMIN']), electionController.updateStatus);
 router.delete('/:id', authorize(['ADMIN']), electionController.deleteElection);
+router.get('/:id/voter-breakdown', (req, res, next) => {
+  if (req.user.role === 'ADMIN' || req.user.position === 'Electoral Chairman') return next();
+  return res.status(403).json({ message: 'Access denied.' });
+}, electionController.getVoterBreakdown);
 
 module.exports = router;

@@ -13,6 +13,7 @@ const EXECUTIVE_POSITIONS = [
     "Assistant Sports Director", 
     "Social Director",
     "Financial Secretary",
+    "Electoral Chairman",
     "Executive Member" // Default
   ];
 

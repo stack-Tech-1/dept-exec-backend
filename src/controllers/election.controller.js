@@ -226,6 +226,54 @@ exports.checkVoted = async (req, res) => {
   }
 };
 
+// GET voter breakdown per candidate (ADMIN or Electoral Chairman only)
+exports.getVoterBreakdown = async (req, res) => {
+  try {
+    const election = await Election.findById(req.params.id);
+    if (!election) return res.status(404).json({ message: 'Election not found' });
+
+    // Gather all matric numbers and look up member names in one query
+    const matricNumbers = [...new Set(election.voters.map(v => v.matricNumber).filter(Boolean))];
+    const members = await Member.find({ matricNumber: { $in: matricNumbers } }, 'name matricNumber');
+    const memberMap = {};
+    members.forEach(m => { memberMap[m.matricNumber] = m.name; });
+
+    // Group voters by candidateId
+    const votersByCandidate = {};
+    election.voters.forEach(v => {
+      const key = v.candidateId.toString();
+      if (!votersByCandidate[key]) votersByCandidate[key] = [];
+      votersByCandidate[key].push({
+        matricNumber: v.matricNumber,
+        name: memberMap[v.matricNumber] || 'Unknown',
+        votedAt: v.votedAt
+      });
+    });
+
+    const candidates = [...election.candidates]
+      .sort((a, b) => b.voteCount - a.voteCount)
+      .map(c => ({
+        _id: c._id,
+        name: c.name,
+        matricNumber: c.matricNumber,
+        photo: c.photo,
+        voteCount: c.voteCount,
+        voters: votersByCandidate[c._id.toString()] || []
+      }));
+
+    res.json({
+      electionId: election._id,
+      title: election.title,
+      position: election.position,
+      session: election.session,
+      totalVotes: election.totalVotes,
+      candidates
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
 // DELETE election (admin only — PENDING or CLOSED only)
 exports.deleteElection = async (req, res) => {
   try {
