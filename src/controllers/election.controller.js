@@ -173,37 +173,55 @@ exports.castVote = async (req, res) => {
       return res.status(404).json({ message: 'Candidate not found' });
     }
 
-    // Record vote
-    candidate.voteCount += 1;
-    election.totalVotes += 1;
-    election.voters.push({
-      matricNumber: matricNumber.trim().toUpperCase(),
-      candidateId,
-      votedAt: new Date()
-    });
-    await election.save();
+    // Atomic vote record — prevents race conditions from concurrent voters
+    const updated = await Election.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: 'OPEN',
+        'voters.matricNumber': { $ne: matricNumber.trim().toUpperCase() },
+        'candidates._id': candidate._id
+      },
+      {
+        $inc: {
+          totalVotes: 1,
+          'candidates.$.voteCount': 1
+        },
+        $push: {
+          voters: {
+            matricNumber: matricNumber.trim().toUpperCase(),
+            candidateId: candidate._id,
+            votedAt: new Date()
+          }
+        }
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(400).json({ message: 'You have already voted in this election.' });
+    }
 
     // Emit live results update
     const io = req.app.get('io');
     if (io) {
       io.emit('vote-cast', {
-        electionId: election._id,
+        electionId: updated._id,
         candidateId,
-        candidates: election.candidates.map(c => ({
+        candidates: updated.candidates.map(c => ({
           _id: c._id,
           name: c.name,
           voteCount: c.voteCount,
-          percentage: election.totalVotes > 0
-            ? Math.round((c.voteCount / election.totalVotes) * 100)
+          percentage: updated.totalVotes > 0
+            ? Math.round((c.voteCount / updated.totalVotes) * 100)
             : 0
         })),
-        totalVotes: election.totalVotes
+        totalVotes: updated.totalVotes
       });
     }
 
     res.json({
       message: `✅ Vote cast successfully for ${candidate.name}!`,
-      totalVotes: election.totalVotes
+      totalVotes: updated.totalVotes
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
