@@ -226,22 +226,25 @@ exports.checkVoted = async (req, res) => {
   }
 };
 
-// GET voter breakdown per candidate (ADMIN or Electoral Chairman only)
+// GET voter breakdown per candidate (ADMIN only)
 exports.getVoterBreakdown = async (req, res) => {
   try {
-    const election = await Election.findById(req.params.id);
+    const election = await Election.findById(req.params.id).lean();
     if (!election) return res.status(404).json({ message: 'Election not found' });
 
+    const voters = election.voters || [];
+
     // Gather all matric numbers and look up member names in one query
-    const matricNumbers = [...new Set(election.voters.map(v => v.matricNumber).filter(Boolean))];
-    const members = await Member.find({ matricNumber: { $in: matricNumbers } }, 'name matricNumber');
+    const matricNumbers = [...new Set(voters.map(v => v.matricNumber).filter(Boolean))];
+    const members = await Member.find({ matricNumber: { $in: matricNumbers } }, 'name matricNumber').lean();
     const memberMap = {};
     members.forEach(m => { memberMap[m.matricNumber] = m.name; });
 
-    // Group voters by candidateId
+    // Group voters by candidateId — use String() to guarantee plain string comparison
     const votersByCandidate = {};
-    election.voters.forEach(v => {
-      const key = v.candidateId.toString();
+    voters.forEach(v => {
+      if (!v.candidateId) return;
+      const key = String(v.candidateId);
       if (!votersByCandidate[key]) votersByCandidate[key] = [];
       votersByCandidate[key].push({
         matricNumber: v.matricNumber,
@@ -258,7 +261,7 @@ exports.getVoterBreakdown = async (req, res) => {
         matricNumber: c.matricNumber,
         photo: c.photo,
         voteCount: c.voteCount,
-        voters: votersByCandidate[c._id.toString()] || []
+        voters: votersByCandidate[String(c._id)] || []
       }));
 
     res.json({
