@@ -1,6 +1,7 @@
 const Member = require('../models/member.model');
 const MemberRegistrationLink = require('../models/memberRegistrationLink.model');
 const { sendEmail } = require('../utils/mailer');
+const { isMatricInRange } = require('../utils/matricRanges');
 
 // GET all members with filtering + pagination
 exports.getMembers = async (req, res) => {
@@ -264,6 +265,12 @@ exports.registerMember = async (req, res) => {
 
     const existingMatric = await Member.findOne({ matricNumber: matricNumber.trim().toUpperCase() });
     if (existingMatric) return res.status(400).json({ message: 'Matric number already registered.' });
+
+    if (!isMatricInRange(matricNumber.trim(), level)) {
+      return res.status(400).json({
+        message: 'Matric number is not in the valid range for the selected level. Please check your details or contact the administrator.'
+      });
+    }
 
     const member = await Member.create({
       name: fullName.trim(),
