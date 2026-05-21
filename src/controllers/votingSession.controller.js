@@ -270,3 +270,73 @@ exports.submitVotes = async (req, res) => {
     res.status(500).json({ message: 'Server error. Please try again.' });
   }
 };
+
+// GET /api/voting-sessions/:token/voters — admin only
+exports.getSessionVoters = async (req, res) => {
+  try {
+    const session = await VotingSession.findOne({ token: req.params.token });
+    if (!session) return res.status(404).json({ message: 'Voting session not found.' });
+
+    const matrics = session.voterLog.map(v => v.identifier);
+    const members = await Member.find({ matricNumber: { $in: matrics } }).select('name matricNumber').lean();
+    const nameMap = {};
+    members.forEach(m => { nameMap[m.matricNumber] = m.name; });
+
+    const voters = session.voterLog.map(v => ({
+      identifier: v.identifier,
+      name: nameMap[v.identifier] ?? null,
+      votedAt: v.votedAt,
+    }));
+
+    res.json(voters);
+  } catch (err) {
+    console.error('Get session voters error:', err);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// DELETE /api/voting-sessions/:token/votes/:matricNumber — admin only
+exports.revokeVote = async (req, res) => {
+  try {
+    const session = await VotingSession.findOne({ token: req.params.token });
+    if (!session) return res.status(404).json({ message: 'Voting session not found.' });
+
+    const normalizedMatric = req.params.matricNumber.toUpperCase();
+    const logIndex = session.voterLog.findIndex(v => v.identifier === normalizedMatric);
+    if (logIndex === -1) return res.status(404).json({ message: 'This member has not voted in this session.' });
+
+    for (const elId of session.elections) {
+      const election = await Election.findById(elId);
+      if (!election) continue;
+
+      const voterIndex = election.voters.findIndex(v => v.matricNumber === normalizedMatric);
+      if (voterIndex !== -1) {
+        const { candidateId } = election.voters[voterIndex];
+        const candidate = election.candidates.id(candidateId);
+        if (candidate && candidate.voteCount > 0) candidate.voteCount -= 1;
+        if (election.totalVotes > 0) election.totalVotes -= 1;
+        election.voters.splice(voterIndex, 1);
+      } else {
+        if (election.undecidedCount > 0) election.undecidedCount -= 1;
+      }
+      await election.save();
+
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('vote-cast', {
+          electionId: election._id.toString(),
+          candidates: election.candidates,
+          totalVotes: election.totalVotes,
+        });
+      }
+    }
+
+    session.voterLog.splice(logIndex, 1);
+    await session.save();
+
+    res.json({ message: 'Vote revoked. This member may now vote again with a new code.' });
+  } catch (err) {
+    console.error('Revoke vote error:', err);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
