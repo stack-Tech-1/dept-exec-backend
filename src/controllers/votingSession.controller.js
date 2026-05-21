@@ -142,9 +142,12 @@ exports.deleteSession = async (req, res) => {
 // POST /api/voting-sessions/:token/vote — public
 exports.submitVotes = async (req, res) => {
   try {
-    const { identifier, votes } = req.body;
+    const { identifier, votes, code } = req.body;
     if (!identifier?.trim()) {
       return res.status(400).json({ message: 'Identifier (matric number) is required.' });
+    }
+    if (!code?.trim()) {
+      return res.status(400).json({ message: 'Vote code is required. Please check your email.' });
     }
     if (!Array.isArray(votes)) {
       return res.status(400).json({ message: 'votes must be an array.' });
@@ -159,9 +162,15 @@ exports.submitVotes = async (req, res) => {
 
     const normalizedId = identifier.trim().toUpperCase();
 
-    const member = await Member.findOne({ matricNumber: normalizedId, isActive: true });
+    const member = await Member.findOne({ matricNumber: normalizedId, isActive: true }).select('+voteCode +voteCodeExpiry');
     if (!member) {
       return res.status(403).json({ message: 'Matric number not found. Only registered department members can vote.' });
+    }
+
+    // Validate vote code
+    if (!member.voteCode || member.voteCode !== code.trim() ||
+        !member.voteCodeExpiry || member.voteCodeExpiry < new Date()) {
+      return res.status(403).json({ message: 'Invalid or expired vote code. Please check your email.' });
     }
 
     const isExec = await User.findOne({ matricNumber: normalizedId });
@@ -216,6 +225,9 @@ exports.submitVotes = async (req, res) => {
 
     session.voterLog.push({ identifier: normalizedId, electionsVoted: sessionElectionIds });
     await session.save();
+
+    // Invalidate the vote code so it cannot be reused
+    await Member.findByIdAndUpdate(member._id, { $unset: { voteCode: '', voteCodeExpiry: '' } });
 
     res.json({ message: 'Votes submitted successfully.' });
   } catch (err) {

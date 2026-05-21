@@ -20,6 +20,8 @@ const memberSchema = new mongoose.Schema({
     note: { type: String }
   }],
   notes: { type: String, maxlength: 500 },
+  voteCode:       { type: String, select: false },
+  voteCodeExpiry: { type: Date },
   registrationToken: { type: mongoose.Schema.Types.ObjectId, ref: 'MemberRegistrationLink', default: null },
   registeredAt: { type: Date, default: null }
 }, { timestamps: true });
