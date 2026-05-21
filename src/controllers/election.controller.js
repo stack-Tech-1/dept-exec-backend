@@ -96,7 +96,7 @@ exports.removeCandidate = async (req, res) => {
 exports.updateStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    if (!['PENDING', 'OPEN', 'CLOSED'].includes(status)) {
+    if (!['PENDING', 'OPEN', 'PAUSED', 'CLOSED'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
     const election = await Election.findById(req.params.id);
@@ -104,11 +104,15 @@ exports.updateStatus = async (req, res) => {
     if (election.status === 'CLOSED') {
       return res.status(400).json({ message: 'This election is already closed and cannot be changed.' });
     }
-    if (status === 'PENDING' && election.status === 'OPEN') {
-      return res.status(400).json({ message: 'An open election cannot be moved back to pending.' });
+    if (status === 'PENDING' && ['OPEN', 'PAUSED'].includes(election.status)) {
+      return res.status(400).json({ message: 'A started election cannot be moved back to pending.' });
+    }
+    if (status === 'PAUSED' && election.status !== 'OPEN') {
+      return res.status(400).json({ message: 'Only an open election can be paused.' });
     }
     election.status = status;
-    if (status === 'OPEN') election.openedAt = new Date();
+    if (status === 'OPEN' && !election.openedAt) election.openedAt = new Date();
+    if (status === 'PAUSED') election.pausedAt = new Date();
     if (status === 'CLOSED') election.closedAt = new Date();
     await election.save();
 

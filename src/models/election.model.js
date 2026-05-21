@@ -15,7 +15,7 @@ const electionSchema = new mongoose.Schema({
   description: { type: String, trim: true },
   status: {
     type: String,
-    enum: ['PENDING', 'OPEN', 'CLOSED'],
+    enum: ['PENDING', 'OPEN', 'PAUSED', 'CLOSED'],
     default: 'PENDING'
   },
   candidates: [candidateSchema],
@@ -27,6 +27,7 @@ const electionSchema = new mongoose.Schema({
   }],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   openedAt: { type: Date },
+  pausedAt: { type: Date },
   closedAt: { type: Date },
   totalVotes: { type: Number, default: 0 },
   undecidedCount: { type: Number, default: 0 }
