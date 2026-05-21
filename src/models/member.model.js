@@ -23,7 +23,9 @@ const memberSchema = new mongoose.Schema({
   voteCode:       { type: String, select: false },
   voteCodeExpiry: { type: Date },
   registrationToken: { type: mongoose.Schema.Types.ObjectId, ref: 'MemberRegistrationLink', default: null },
-  registeredAt: { type: Date, default: null }
+  registeredAt: { type: Date, default: null },
+  isDirectEntry:  { type: Boolean, default: false },
+  approvalStatus: { type: String, enum: ['approved', 'pending', 'rejected'], default: 'approved' },
 }, { timestamps: true });
 
 memberSchema.index({ name: 'text', email: 'text', matricNumber: 'text' });

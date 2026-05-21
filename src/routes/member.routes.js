@@ -17,6 +17,7 @@ router.delete('/links/:id',       authorize(['ADMIN']), memberController.deactiv
 // Member CRUD
 router.get('/', memberController.getMembers);
 router.get('/stats', memberController.getMemberStats);
+router.get('/pending-de', authorize(['ADMIN']), memberController.listPendingDE);
 router.get('/:id', memberController.getMemberById);
 router.post('/', authorize(['ADMIN']), memberController.createMember);
 router.put('/:id', authorize(['ADMIN']), memberController.updateMember);
@@ -24,5 +25,7 @@ router.delete('/:id', authorize(['ADMIN']), memberController.deleteMember);
 router.post('/:id/dues', authorize(['ADMIN']), memberController.recordDues);
 router.post('/:id/send-vote-code', authorize(['ADMIN']), memberController.sendVoteCode);
 router.post('/bulk-import', authorize(['ADMIN']), memberController.bulkImport);
+router.patch('/:id/approve', authorize(['ADMIN']), memberController.approveMember);
+router.delete('/:id/reject', authorize(['ADMIN']), memberController.rejectMember);
 
 module.exports = router;

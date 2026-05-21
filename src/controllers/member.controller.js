@@ -225,6 +225,44 @@ exports.deactivateLink = async (req, res) => {
   }
 };
 
+// GET list pending D.E. applications (admin only)
+exports.listPendingDE = async (req, res) => {
+  try {
+    const members = await Member.find({ approvalStatus: 'pending', isDirectEntry: true })
+      .sort({ createdAt: 1 })
+      .populate('addedBy', 'name');
+    res.json(members);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+// PATCH approve a pending D.E. member (admin only)
+exports.approveMember = async (req, res) => {
+  try {
+    const member = await Member.findOneAndUpdate(
+      { _id: req.params.id, approvalStatus: 'pending' },
+      { isActive: true, approvalStatus: 'approved' },
+      { new: true }
+    );
+    if (!member) return res.status(404).json({ message: 'Pending member not found.' });
+    res.json({ message: 'Member approved.', member });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+// DELETE reject a pending D.E. application (admin only)
+exports.rejectMember = async (req, res) => {
+  try {
+    const member = await Member.findOneAndDelete({ _id: req.params.id, approvalStatus: 'pending' });
+    if (!member) return res.status(404).json({ message: 'Pending member not found.' });
+    res.json({ message: 'Application rejected and removed.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
 // GET validate a registration link (PUBLIC)
 exports.validateLink = async (req, res) => {
   try {
@@ -255,7 +293,7 @@ exports.registerMember = async (req, res) => {
       return res.status(400).json({ message: 'This registration link has expired.' });
     }
 
-    const { fullName, email, matricNumber, level, phone, gender } = req.body;
+    const { fullName, email, matricNumber, level, phone, gender, isDirectEntry } = req.body;
     if (!fullName?.trim() || !email?.trim() || !matricNumber?.trim() || !level || !phone?.trim() || !gender) {
       return res.status(400).json({ message: 'All fields are required: fullName, email, matricNumber, level, phone, gender.' });
     }
@@ -266,7 +304,7 @@ exports.registerMember = async (req, res) => {
     const existingMatric = await Member.findOne({ matricNumber: matricNumber.trim().toUpperCase() });
     if (existingMatric) return res.status(400).json({ message: 'Matric number already registered.' });
 
-    if (!isMatricInRange(matricNumber.trim(), level)) {
+    if (!isDirectEntry && !isMatricInRange(matricNumber.trim(), level)) {
       return res.status(400).json({
         message: 'Matric number is not in the valid range for the selected level. Please check your details or contact the administrator.'
       });
@@ -279,11 +317,20 @@ exports.registerMember = async (req, res) => {
       level,
       phone: phone.trim(),
       gender,
+      isDirectEntry: !!isDirectEntry,
+      isActive: !isDirectEntry,
+      approvalStatus: isDirectEntry ? 'pending' : 'approved',
       registrationToken: link._id,
       registeredAt: new Date()
     });
 
-    res.status(201).json({ message: 'Registration successful.', memberId: member._id });
+    res.status(201).json({
+      message: isDirectEntry
+        ? 'Registration submitted. An administrator will review your application.'
+        : 'Registration successful.',
+      memberId: member._id,
+      pending: !!isDirectEntry,
+    });
   } catch (err) {
     console.error('Register member error:', err);
     if (err.code === 11000) {
