@@ -55,6 +55,9 @@ exports.getSessionByToken = async (req, res) => {
 
     if (!session) return res.status(404).json({ message: 'Voting session not found.' });
     if (!session.isActive) return res.status(400).json({ message: 'This voting session is no longer active.' });
+    if (session.isPaused) {
+      return res.json({ isPaused: true, label: session.label, message: 'Voting is temporarily paused. Please check back soon.' });
+    }
     if (session.expiresAt && session.expiresAt < new Date()) {
       return res.status(400).json({ message: 'This voting session has expired.' });
     }
@@ -139,6 +142,35 @@ exports.deleteSession = async (req, res) => {
   }
 };
 
+// PATCH /api/voting-sessions/:token/pause — admin only
+exports.pauseSession = async (req, res) => {
+  try {
+    const session = await VotingSession.findOne({ token: req.params.token });
+    if (!session) return res.status(404).json({ message: 'Voting session not found.' });
+    if (!session.isActive) return res.status(400).json({ message: 'Session is already deactivated.' });
+    session.isPaused = true;
+    await session.save();
+    res.json({ message: 'Voting session paused.', isPaused: true });
+  } catch (err) {
+    console.error('Pause session error:', err);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// PATCH /api/voting-sessions/:token/resume — admin only
+exports.resumeSession = async (req, res) => {
+  try {
+    const session = await VotingSession.findOne({ token: req.params.token });
+    if (!session) return res.status(404).json({ message: 'Voting session not found.' });
+    session.isPaused = false;
+    await session.save();
+    res.json({ message: 'Voting session resumed.', isPaused: false });
+  } catch (err) {
+    console.error('Resume session error:', err);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
 // POST /api/voting-sessions/:token/vote — public
 exports.submitVotes = async (req, res) => {
   try {
@@ -156,6 +188,9 @@ exports.submitVotes = async (req, res) => {
     const session = await VotingSession.findOne({ token: req.params.token });
     if (!session) return res.status(404).json({ message: 'Voting session not found.' });
     if (!session.isActive) return res.status(400).json({ message: 'This voting session is no longer active.' });
+    if (session.isPaused) {
+      return res.status(400).json({ message: 'Voting is currently paused. Please wait for it to resume.' });
+    }
     if (session.expiresAt && session.expiresAt < new Date()) {
       return res.status(400).json({ message: 'This voting session has expired.' });
     }

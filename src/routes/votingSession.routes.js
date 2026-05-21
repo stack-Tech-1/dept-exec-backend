@@ -13,6 +13,8 @@ router.get('/',              ctrl.listSessions);
 router.post('/',             adminOnly, ctrl.createSession);
 router.patch('/:token/deactivate',  adminOnly, ctrl.deactivateSession);
 router.patch('/:token/close-all',   adminOnly, ctrl.closeSessionElections);
+router.patch('/:token/pause',       adminOnly, ctrl.pauseSession);
+router.patch('/:token/resume',      adminOnly, ctrl.resumeSession);
 router.delete('/:token',            adminOnly, ctrl.deleteSession);
 
 module.exports = router;

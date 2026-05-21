@@ -12,6 +12,7 @@ const votingSessionSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   label: { type: String, trim: true },
   isActive: { type: Boolean, default: true },
+  isPaused: { type: Boolean, default: false },
   expiresAt: { type: Date },
   voterLog: [{
     identifier: { type: String, uppercase: true, trim: true },
