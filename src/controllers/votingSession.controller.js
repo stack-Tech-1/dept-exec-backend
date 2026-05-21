@@ -197,6 +197,11 @@ exports.submitVotes = async (req, res) => {
 
       candidate.voteCount += 1;
       election.totalVotes += 1;
+      election.voters.push({
+        matricNumber: normalizedId,
+        candidateId: candidate._id,
+        votedAt: new Date()
+      });
       await election.save();
 
       votedElectionIds.add(electionId.toString());

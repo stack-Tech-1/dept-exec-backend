@@ -1,6 +1,7 @@
 const Election = require('../models/election.model');
 const Member = require('../models/member.model');
 const User = require('../models/user.model');
+const VotingSession = require('../models/votingSession.model');
 
 // GET all elections
 exports.getElections = async (req, res) => {
@@ -275,6 +276,33 @@ exports.getVoterBreakdown = async (req, res) => {
       });
     });
 
+    // Recover voters from VotingSession logs (for votes cast before election.voters was populated)
+    const sessionDocs = await VotingSession.find({
+      'voterLog.electionsVoted': election._id
+    }).lean();
+    const sessionVoterSet = new Set();
+    sessionDocs.forEach(s => {
+      s.voterLog.forEach(entry => {
+        if (entry.electionsVoted.some(id => String(id) === String(election._id))) {
+          sessionVoterSet.add(entry.identifier);
+        }
+      });
+    });
+
+    // Merge direct voters + session voters into a flat allVoters list
+    const directMatrics = voters.map(v => v.matricNumber).filter(Boolean);
+    const allMatrics = [...new Set([...directMatrics, ...sessionVoterSet])];
+    const missingMatrics = allMatrics.filter(m => !memberMap[m]);
+    if (missingMatrics.length > 0) {
+      const extra = await Member.find({ matricNumber: { $in: missingMatrics } }, 'name matricNumber').lean();
+      extra.forEach(m => { memberMap[m.matricNumber] = m.name; });
+    }
+    const allVoters = allMatrics.map(matric => ({
+      matricNumber: matric,
+      name: memberMap[matric] || 'Unknown',
+      votedAt: voters.find(v => v.matricNumber === matric)?.votedAt ?? null
+    }));
+
     const candidates = [...election.candidates]
       .sort((a, b) => b.voteCount - a.voteCount)
       .map(c => ({
@@ -292,7 +320,8 @@ exports.getVoterBreakdown = async (req, res) => {
       position: election.position,
       session: election.session,
       totalVotes: election.totalVotes,
-      candidates
+      candidates,
+      allVoters
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
