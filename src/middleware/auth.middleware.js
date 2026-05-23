@@ -120,6 +120,22 @@ exports.execOnly = (req, res, next) => {
   next();
 };
 
+// Election admin middleware — only Electoral Chairman or System Administrator
+const ELECTION_ADMIN_POSITIONS = ['Electoral Chairman', 'System Administrator'];
+
+exports.electionAdminOnly = (req, res, next) => {
+  if (!req.user || req.user.role !== 'ADMIN') {
+    return res.status(403).json({ success: false, message: 'Access denied.' });
+  }
+  if (!ELECTION_ADMIN_POSITIONS.includes(req.user.position)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Only the Electoral Chairman or System Administrator can perform this action.'
+    });
+  }
+  next();
+};
+
 // Check if user owns resource
 exports.checkOwnership = (modelName, idParam = 'id') => {
   return async (req, res, next) => {

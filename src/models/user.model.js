@@ -4,15 +4,19 @@ const mongoose = require("mongoose");
 // Define executive positions
 const EXECUTIVE_POSITIONS = [
     "President",
-    "Vice President", 
+    "Vice President",
     "General Secretary",
     "Assistant General Secretary",
     "Treasurer",
     "Public Relations Officer",
     "Sports Director",
-    "Assistant Sports Director", 
+    "Assistant Sports Director",
     "Social Director",
     "Financial Secretary",
+    "Undergraduate Coordinator",
+    "Electoral Chairman",
+    "System Administrator",
+    "Electoral Committee",
     "Executive Member" // Default
   ];
 

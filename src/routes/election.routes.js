@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const electionController = require('../controllers/election.controller');
-const { authenticate, authorize } = require('../middleware/auth.middleware');
+const { authenticate, authorize, electionAdminOnly } = require('../middleware/auth.middleware');
 const { uploadTaskFile } = require('../config/cloudinary');
 
 // PUBLIC routes — no auth needed
@@ -13,11 +13,11 @@ router.get('/:id/check-voted', electionController.checkVoted);
 router.use(authenticate);
 router.get('/', electionController.getElections);
 router.get('/:id', electionController.getElectionById);
-router.post('/', authorize(['ADMIN']), electionController.createElection);
-router.post('/:id/candidates', authorize(['ADMIN']), uploadTaskFile.single('photo'), electionController.addCandidate);
-router.delete('/:id/candidates/:candidateId', authorize(['ADMIN']), electionController.removeCandidate);
-router.patch('/:id/status', authorize(['ADMIN']), electionController.updateStatus);
-router.delete('/:id', authorize(['ADMIN']), electionController.deleteElection);
+router.post('/', electionAdminOnly, electionController.createElection);
+router.post('/:id/candidates', electionAdminOnly, uploadTaskFile.single('photo'), electionController.addCandidate);
+router.delete('/:id/candidates/:candidateId', electionAdminOnly, electionController.removeCandidate);
+router.patch('/:id/status', electionAdminOnly, electionController.updateStatus);
+router.delete('/:id', electionAdminOnly, electionController.deleteElection);
 router.get('/:id/voter-breakdown', authorize(['ADMIN']), electionController.getVoterBreakdown);
 
 module.exports = router;
