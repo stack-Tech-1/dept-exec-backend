@@ -19,6 +19,20 @@ const votingSessionSchema = new mongoose.Schema({
     votedAt: { type: Date, default: Date.now },
     electionsVoted: [{ type: mongoose.Schema.Types.ObjectId }],
     _id: false
+  }],
+  revocationLog: [{
+    identifier: { type: String, uppercase: true, trim: true },
+    revokedAt:  { type: Date, default: Date.now },
+    revokedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    elections: [{
+      electionId:    { type: mongoose.Schema.Types.ObjectId },
+      electionTitle: { type: String },
+      candidateId:   { type: mongoose.Schema.Types.ObjectId },
+      candidateName: { type: String },
+      votedAt:       { type: Date },
+      _id: false,
+    }],
+    _id: false,
   }]
 }, { timestamps: true });
 

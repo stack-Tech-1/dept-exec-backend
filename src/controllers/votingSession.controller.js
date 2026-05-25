@@ -305,6 +305,24 @@ exports.revokeVote = async (req, res) => {
     const logIndex = session.voterLog.findIndex(v => v.identifier === normalizedMatric);
     if (logIndex === -1) return res.status(404).json({ message: 'This member has not voted in this session.' });
 
+    // Capture full vote snapshot before any deletion
+    const revEntry = { identifier: normalizedMatric, revokedBy: req.user.id, elections: [] };
+    for (const elId of session.elections) {
+      const elSnap = await Election.findById(elId);
+      if (!elSnap) continue;
+      const vr = elSnap.voters.find(v => v.matricNumber === normalizedMatric);
+      if (!vr) continue;
+      const cand = elSnap.candidates.id(vr.candidateId);
+      revEntry.elections.push({
+        electionId:    elSnap._id,
+        electionTitle: elSnap.title,
+        candidateId:   vr.candidateId,
+        candidateName: cand?.name ?? null,
+        votedAt:       vr.votedAt,
+      });
+    }
+    session.revocationLog.push(revEntry);
+
     for (const elId of session.elections) {
       const election = await Election.findById(elId);
       if (!election) continue;
@@ -337,6 +355,35 @@ exports.revokeVote = async (req, res) => {
     res.json({ message: 'Vote revoked. This member may now vote again with a new code.' });
   } catch (err) {
     console.error('Revoke vote error:', err);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// GET /voting-sessions/:token/revocation-log — admin only
+exports.getRevocationLog = async (req, res) => {
+  try {
+    const session = await VotingSession.findOne({ token: req.params.token })
+      .populate('revocationLog.revokedBy', 'name position');
+    if (!session) return res.status(404).json({ message: 'Session not found.' });
+
+    const matrics = session.revocationLog.map(r => r.identifier);
+    const members = await Member.find({ matricNumber: { $in: matrics } })
+      .select('name matricNumber level isActive').lean();
+    const memberMap = Object.fromEntries(members.map(m => [m.matricNumber, m]));
+
+    const log = session.revocationLog.map(r => ({
+      identifier:      r.identifier,
+      revokedAt:       r.revokedAt,
+      revokedBy:       r.revokedBy,
+      elections:       r.elections,
+      memberName:      memberMap[r.identifier]?.name ?? null,
+      memberLevel:     memberMap[r.identifier]?.level ?? null,
+      memberIsDeleted: memberMap[r.identifier] ? !memberMap[r.identifier].isActive : true,
+    }));
+
+    res.json(log);
+  } catch (err) {
+    console.error('Get revocation log error:', err);
     res.status(500).json({ message: 'Server error. Please try again.' });
   }
 };

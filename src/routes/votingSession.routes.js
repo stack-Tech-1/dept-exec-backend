@@ -15,7 +15,8 @@ router.patch('/:token/deactivate',  electionAdminOnly, ctrl.deactivateSession);
 router.patch('/:token/close-all',   electionAdminOnly, ctrl.closeSessionElections);
 router.patch('/:token/pause',       electionAdminOnly, ctrl.pauseSession);
 router.patch('/:token/resume',      electionAdminOnly, ctrl.resumeSession);
-router.get('/:token/voters',        adminOnly, ctrl.getSessionVoters);
+router.get('/:token/voters',           adminOnly, ctrl.getSessionVoters);
+router.get('/:token/revocation-log',  adminOnly, ctrl.getRevocationLog);
 router.delete('/:token/votes/:matricNumber', electionAdminOnly, ctrl.revokeVote);
 router.delete('/:token',            electionAdminOnly, ctrl.deleteSession);
 
