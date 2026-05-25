@@ -7,7 +7,7 @@ const { isMatricInRange } = require('../utils/matricRanges');
 exports.getMembers = async (req, res) => {
   try {
     const { level, gender, duesPaid, session, search, page = 1, limit = 50 } = req.query;
-    const filter = { isActive: true };
+    const filter = { isActive: req.query.isActive === 'false' ? false : true };
     if (level) filter.level = level;
     if (gender) filter.gender = gender;
     if (search) {
@@ -247,6 +247,21 @@ exports.approveMember = async (req, res) => {
     );
     if (!member) return res.status(404).json({ message: 'Pending member not found.' });
     res.json({ message: 'Member approved.', member });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+// PATCH restore a soft-deleted member (admin only)
+exports.restoreMember = async (req, res) => {
+  try {
+    const member = await Member.findByIdAndUpdate(
+      req.params.id,
+      { isActive: true },
+      { new: true }
+    );
+    if (!member) return res.status(404).json({ message: 'Member not found.' });
+    res.json(member);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }

@@ -22,6 +22,7 @@ router.get('/:id', memberController.getMemberById);
 router.post('/', authorize(['ADMIN']), memberController.createMember);
 router.put('/:id', authorize(['ADMIN']), memberController.updateMember);
 router.delete('/:id', authorize(['ADMIN']), memberController.deleteMember);
+router.patch('/:id/restore', authorize(['ADMIN']), memberController.restoreMember);
 router.post('/:id/dues', authorize(['ADMIN']), memberController.recordDues);
 router.post('/:id/send-vote-code', authorize(['ADMIN']), memberController.sendVoteCode);
 router.post('/bulk-import', authorize(['ADMIN']), memberController.bulkImport);
