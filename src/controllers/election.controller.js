@@ -342,3 +342,72 @@ exports.deleteElection = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
+
+// GET vote audit — deleted members who voted + orphaned votes for removed candidates
+exports.getVoteAudit = async (req, res) => {
+  try {
+    const elections = await Election.find({}, 'title position session status voters candidates').lean();
+
+    const allMatrics = [...new Set(elections.flatMap(e => e.voters.map(v => v.matricNumber)))];
+
+    const deletedMembers = await Member.find({ matricNumber: { $in: allMatrics }, isActive: false }).lean();
+
+    const deletedVoterRecords = deletedMembers.map(member => {
+      const votes = [];
+      for (const election of elections) {
+        const vr = election.voters.find(v => v.matricNumber === member.matricNumber);
+        if (!vr) continue;
+        const candidate = election.candidates.find(c => c._id.toString() === vr.candidateId?.toString());
+        votes.push({
+          electionId: election._id,
+          electionTitle: election.title,
+          electionPosition: election.position,
+          electionSession: election.session,
+          candidateName: candidate?.name ?? null,
+          candidateMatric: candidate?.matricNumber ?? null,
+          votedAt: vr.votedAt,
+        });
+      }
+      return { member, votes };
+    });
+
+    const orphanVotes = [];
+    for (const election of elections) {
+      const candidateIds = new Set(election.candidates.map(c => c._id.toString()));
+      const orphaned = election.voters.filter(v => v.candidateId && !candidateIds.has(v.candidateId.toString()));
+      if (orphaned.length === 0) continue;
+
+      const grouped = {};
+      for (const v of orphaned) {
+        const key = v.candidateId.toString();
+        if (!grouped[key]) grouped[key] = { candidateId: key, voters: [] };
+        grouped[key].voters.push({ matricNumber: v.matricNumber, votedAt: v.votedAt });
+      }
+
+      const voterMatrics = orphaned.map(v => v.matricNumber);
+      const members = await Member.find({ matricNumber: { $in: voterMatrics } }, 'name matricNumber isActive').lean();
+      const nameMap = Object.fromEntries(members.map(m => [m.matricNumber, { name: m.name, isActive: m.isActive }]));
+
+      for (const group of Object.values(grouped)) {
+        orphanVotes.push({
+          electionId: election._id,
+          electionTitle: election.title,
+          electionPosition: election.position,
+          electionSession: election.session,
+          removedCandidateId: group.candidateId,
+          voteCount: group.voters.length,
+          voters: group.voters.map(v => ({
+            matricNumber: v.matricNumber,
+            name: nameMap[v.matricNumber]?.name ?? null,
+            isDeleted: nameMap[v.matricNumber] ? !nameMap[v.matricNumber].isActive : false,
+            votedAt: v.votedAt,
+          })),
+        });
+      }
+    }
+
+    res.json({ deletedVoterRecords, orphanVotes });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};

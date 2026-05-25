@@ -18,6 +18,7 @@ router.post('/:id/candidates', electionAdminOnly, uploadTaskFile.single('photo')
 router.delete('/:id/candidates/:candidateId', electionAdminOnly, electionController.removeCandidate);
 router.patch('/:id/status', electionAdminOnly, electionController.updateStatus);
 router.delete('/:id', electionAdminOnly, electionController.deleteElection);
+router.get('/vote-audit', authorize(['ADMIN']), electionController.getVoteAudit);
 router.get('/:id/voter-breakdown', authorize(['ADMIN']), electionController.getVoterBreakdown);
 
 module.exports = router;
