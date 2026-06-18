@@ -228,7 +228,7 @@ exports.deactivateLink = async (req, res) => {
 // GET list pending D.E. applications (admin only)
 exports.listPendingDE = async (req, res) => {
   try {
-    const members = await Member.find({ approvalStatus: 'pending', isDirectEntry: true })
+    const members = await Member.find({ approvalStatus: 'pending' })
       .sort({ createdAt: 1 })
       .populate('addedBy', 'name');
     res.json(members);
@@ -319,11 +319,8 @@ exports.registerMember = async (req, res) => {
     const existingMatric = await Member.findOne({ matricNumber: matricNumber.trim().toUpperCase() });
     if (existingMatric) return res.status(400).json({ message: 'Matric number already registered.' });
 
-    if (!isDirectEntry && !isMatricInRange(matricNumber.trim(), level)) {
-      return res.status(400).json({
-        message: 'Matric number is not in the valid range for the selected level. Please check your details or contact the administrator.'
-      });
-    }
+    const outOfRange = !isDirectEntry && !isMatricInRange(matricNumber.trim(), level);
+    const needsApproval = !!isDirectEntry || outOfRange;
 
     const member = await Member.create({
       name: fullName.trim(),
@@ -333,18 +330,18 @@ exports.registerMember = async (req, res) => {
       phone: phone.trim(),
       gender,
       isDirectEntry: !!isDirectEntry,
-      isActive: !isDirectEntry,
-      approvalStatus: isDirectEntry ? 'pending' : 'approved',
+      isActive: !needsApproval,
+      approvalStatus: needsApproval ? 'pending' : 'approved',
       registrationToken: link._id,
       registeredAt: new Date()
     });
 
     res.status(201).json({
-      message: isDirectEntry
+      message: needsApproval
         ? 'Registration submitted. An administrator will review your application.'
         : 'Registration successful.',
       memberId: member._id,
-      pending: !!isDirectEntry,
+      pending: needsApproval,
     });
   } catch (err) {
     console.error('Register member error:', err);
