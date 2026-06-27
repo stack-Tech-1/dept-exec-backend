@@ -17,6 +17,7 @@ const EXECUTIVE_POSITIONS = [
     "Electoral Chairman",
     "System Administrator",
     "Electoral Committee",
+    "Social Committee",
     "Executive Member" // Default
   ];
 
